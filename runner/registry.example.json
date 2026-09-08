@@ -1,0 +1,30 @@
+{
+  "my-app": {
+    "repo": "you/my-app",
+    "cloneUrl": "https://github.com/you/my-app.git",
+    "pm": "npm",
+    "install": [
+      "npm",
+      "ci"
+    ],
+    "verify": [
+      {
+        "name": "typecheck",
+        "cmd": [
+          "npx",
+          "tsc",
+          "--noEmit"
+        ]
+      }
+    ],
+    "safePaths": [
+      "src/**",
+      "public/**"
+    ],
+    "defaultModel": "omen-alpha",
+    "allowedModels": [
+      "omen-alpha",
+      "glm-5.3-flash"
+    ]
+  }
+}

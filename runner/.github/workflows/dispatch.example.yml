@@ -1,0 +1,83 @@
+name: runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: "Project id from runner/registry.json"
+        required: true
+        type: string
+      request:
+        description: "The runner: what to do"
+        required: true
+        type: string
+      session:
+        description: "Session id (branch naming + tracking)"
+        required: false
+        type: string
+        default: ""
+      model:
+        description: "opencode-go model id"
+        required: false
+        type: string
+        default: "glm-5.3-flash"
+      mode:
+        description: "auto lets the agent decide; ask forces read-only answers"
+        required: false
+        type: string
+        default: "auto"
+      run_id:
+        description: "Dashboard run id for webhook reporting"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: runner-${{ inputs.project }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install pi
+        run: npm install -g @earendil-works/pi-coding-agent
+      - name: Restore pi session
+        if: ${{ inputs.session != '' }}
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: pi-session-${{ inputs.session }}
+          path: pi-session
+      - name: Run runner
+        env:
+          PROJECT: ${{ inputs.project }}
+          REQUEST: ${{ inputs.request }}
+          SESSION: ${{ inputs.session }}
+          MODEL: ${{ inputs.model }}
+          MODE: ${{ inputs.mode }}
+          RUN_ID: ${{ inputs.run_id }}
+          APP_ID: ${{ secrets.APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          IJRA_WEBHOOK_URL: https://your-dashboard.example.com/api/internal/answer
+          IJRA_RUNNER_KEY: ${{ secrets.IJRA_RUNNER_KEY }}
+        run: node runner/run-request.mjs
+      - name: Save pi session
+        if: ${{ inputs.session != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-session-${{ inputs.session }}
+          path: pi-session
+          retention-days: 90
