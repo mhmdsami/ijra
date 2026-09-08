@@ -1,0 +1,6 @@
+{
+  "runnerRepo": "you/your-runner",
+  "projects": {
+    "my-app": { "repo": "you/my-app", "defaultModel": "omen-alpha" }
+  }
+}
