@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ijra",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "routes": [{ "pattern": "ijra.sam1.space", "custom_domain": true }],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ijra",
+      "database_id": "27589215-ff35-4ddb-bfda-ec51732822e7",
+      "migrations_dir": "migrations/d1"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

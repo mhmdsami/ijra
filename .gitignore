@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.open-next/
+.wrangler/
+.dev.vars
+.session-export.json
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# private deployment config (example tracked as src/projects.example.json)
+/src/projects.json
+
