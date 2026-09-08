@@ -86,14 +86,13 @@ export async function syncRun(run: {
     const resolved = await resolveRunId(run.dispatchAt);
     if (!resolved) return { status: "dispatching", agentSummary: null };
     ghRunId = resolved.id;
-    await updateRun(run.id, { gh_run_id: resolved.id, gh_run_url: resolved.html_url, status: "running" });
+    await updateRun(run.id, { gh_run_id: resolved.id, gh_run_url: resolved.html_url });
   }
 
   const ghRun = await gh<GHRun>(`/repos/${RUNNER_REPO}/actions/runs/${ghRunId}`);
   if (!ghRun) return { status: "failed", runUrl: null, agentSummary: null };
 
   if (ghRun.status !== "completed") {
-    await updateRun(run.id, { gh_run_url: ghRun.html_url, status: "running" });
     return { status: "running", agentSummary: null };
   }
 
