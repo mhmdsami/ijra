@@ -1,0 +1,1 @@
+ALTER TABLE user_projects ADD COLUMN can_write INTEGER NOT NULL DEFAULT 0;
