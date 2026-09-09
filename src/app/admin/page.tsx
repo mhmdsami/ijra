@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { guardAdmin, usersWithGrants } from "./actions";
-import { getSuperAdminId } from "@/db";
-import { UserCard } from "./user-card";
-import { projects } from "@/lib/projects";
+import { UserList } from "./user-list";
+import { DEFAULT_DAILY_LIMIT, getSuperAdminId } from "@/db";
+import { MODELS, projects } from "@/lib/projects";
 import { HeaderActions } from "../header-actions";
 
 export const dynamic = "force-dynamic";
@@ -34,17 +34,14 @@ export default async function AdminPage() {
           </p>
         </div>
 
-        {users.map((user) => (
-          <UserCard
-            key={user.id}
-            user={user}
-            meId={admin.id}
-            allProjects={ALL_PROJECTS}
-            locked={user.id === superAdminId}
-            viewerIsSuperAdmin={admin.id === superAdminId}
-          />
-        ))}
-        {users.length === 0 && <p className="text-xs text-muted-foreground">New sign-ins will appear here.</p>}
+        <UserList
+          users={users}
+          meId={admin.id}
+          allProjects={ALL_PROJECTS}
+          models={MODELS}
+          defaultLimit={DEFAULT_DAILY_LIMIT}
+          superAdminId={superAdminId}
+        />
       </div>
     </div>
   );

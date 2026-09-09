@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   const fingerprint = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${req.headers.get("x-ijra-timestamp")}.${body}`)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   const replay = await env().DB.prepare("INSERT OR IGNORE INTO runner_callbacks (fingerprint, run_id, received_at) VALUES (?, ?, ?)").bind(fingerprint, payload.runId, Date.now()).run();
   if (replay.meta.changes !== 1) return NextResponse.json({ ok: true });
+  await env().DB.prepare("DELETE FROM runner_callbacks WHERE received_at < ?").bind(Date.now() - 24 * 60 * 60_000).run();
   const run = await getRun(payload.runId);
   if (!run) return NextResponse.json({ error: "unknown run" }, { status: 404 });
   if (!["dispatching", "running"].includes(run.status)) return NextResponse.json({ error: "invalid run transition" }, { status: 409 });

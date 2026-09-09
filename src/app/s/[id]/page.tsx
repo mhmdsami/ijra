@@ -1,4 +1,4 @@
-import { getMessages, getRuns, getSession, listSessionsForUser } from "@/db";
+import { getMessages, getOwnerEmail, getRuns, getSession, listSessionsForUser } from "@/db";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
 import { notFound } from "next/navigation";
 import { SessionView } from "./session-view";
@@ -11,10 +11,11 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const session = await getSession(id);
   if (!session || !canAccessSession(user, session)) notFound();
 
-  const [messages, runs, sessions] = await Promise.all([
+  const [messages, runs, sessions, ownerEmail] = await Promise.all([
     getMessages(id),
     getRuns(id),
     listSessionsForUser(user.id, user.allowedProjects),
+    session.owner_id && session.owner_id !== user.id ? getOwnerEmail(session.owner_id) : Promise.resolve(null),
   ]);
   return (
     <SessionView
@@ -23,6 +24,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         messages,
         runs,
         sessions,
+        ownerEmail,
+        viewerId: user.id,
         canWrite: canWriteProject(user, session.project),
         canDecide: user.isAdmin || session.owner_id === user.id,
       }}

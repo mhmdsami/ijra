@@ -17,7 +17,7 @@ import { MODELS, MODEL_LABELS, projectConfig } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import type { MessageRow, RunRow, SessionRow, SessionRowWithStatus } from "@/db";
 
-type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; sessions: SessionRowWithStatus[]; canWrite: boolean; canDecide: boolean };
+type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; sessions: SessionRowWithStatus[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; canDecide: boolean };
 const ACTIVE = new Set(["dispatching", "running"]);
 
 export function SessionView({ initial }: { initial: State }) {
@@ -98,7 +98,7 @@ export function SessionView({ initial }: { initial: State }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <ThreadsSidebar sessions={state.sessions} />
+      <ThreadsSidebar sessions={state.sessions} showOwner={state.session.owner_id !== state.viewerId || state.sessions.some((s) => s.owner_id !== state.viewerId)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
           <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
@@ -112,6 +112,9 @@ export function SessionView({ initial }: { initial: State }) {
             >
               {state.session.project}
             </Link>
+            {state.session.owner_id && state.session.owner_id !== state.viewerId && state.ownerEmail && (
+              <span className="text-[10px] text-muted-foreground" title="Session owner">{state.ownerEmail}</span>
+            )}
             <Button onClick={deleteThread} variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete thread">
               <Trash2 className="size-3.5" />
             </Button>
@@ -150,6 +153,7 @@ export function SessionView({ initial }: { initial: State }) {
                   onSend={send}
                   busy={sending}
                   disabled={!input.trim()}
+                  quotaKey={state.runs.length}
                 />
               </span>
             </p>

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import type { SessionRowWithStatus } from "@/db";
 import { cn } from "@/lib/utils";
 
-export function ThreadsSidebar({ sessions }: { sessions: SessionRowWithStatus[] }) {
+export function ThreadsSidebar({ sessions, showOwner = false }: { sessions: SessionRowWithStatus[]; showOwner?: boolean }) {
   const [open, setOpen] = useState(true);
   const pathname = usePathname();
 
@@ -63,7 +63,10 @@ export function ThreadsSidebar({ sessions }: { sessions: SessionRowWithStatus[] 
                     pathname === `/s/${session.id}` && "bg-secondary"
                   )}
                 >
-                  <div className="truncate text-xs text-foreground">{session.title || "Untitled request"}</div>
+                  <div className="truncate text-xs text-foreground">
+                    {session.title || "Untitled request"}
+                    {showOwner && session.owner_email && <span className="ml-1.5 text-[9px] text-muted-foreground/70">{session.owner_email.split("@")[0]}</span>}
+                  </div>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <span className="truncate text-[10px] text-muted-foreground">{session.project}</span>
                     <StatusBadge status={session.last_status} />

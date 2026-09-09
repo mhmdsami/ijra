@@ -1,5 +1,7 @@
 import { env, now } from "./env";
 
+export const DEFAULT_DAILY_LIMIT = 5;
+
 export interface SessionRow {
   id: string;
   project: string;
@@ -106,13 +108,15 @@ export async function getUserProjects(userId: string) {
 }
 
 const listSessionsBase = `
-  SELECT s.*, (SELECT r.status FROM runs r WHERE r.session_id = s.id ORDER BY r.dispatch_at DESC, r.rowid DESC LIMIT 1) AS last_status
+  SELECT s.*, (SELECT r.status FROM runs r WHERE r.session_id = s.id ORDER BY r.dispatch_at DESC, r.rowid DESC LIMIT 1) AS last_status,
+    (SELECT email FROM user WHERE id = s.owner_id) AS owner_email
   FROM sessions s`;
 const getMessagesStmt = "SELECT * FROM messages WHERE session_id = ? ORDER BY created_at, id";
 const getRunsStmt = "SELECT * FROM runs WHERE session_id = ? ORDER BY dispatch_at, rowid";
 
 export interface SessionRowWithStatus extends SessionRow {
   last_status: string | null;
+  owner_email: string | null;
 }
 
 export async function listSessionsForUser(userId: string, allowedProjects: string[] | null) {
@@ -126,6 +130,11 @@ export async function listSessionsForUser(userId: string, allowedProjects: strin
     : env().DB.prepare(stmt).bind(userId, ...allowedProjects)
   ).all<SessionRowWithStatus>();
   return results ?? [];
+}
+
+export async function getOwnerEmail(userId: string) {
+  const row = await env().DB.prepare("SELECT email FROM user WHERE id = ?").bind(userId).first<{ email: string }>();
+  return row?.email ?? null;
 }
 
 export async function getSession(id: string) {
@@ -176,11 +185,39 @@ export async function appendAuditEvent(input: {
     .run();
 }
 
-export async function countRequestsForUserSince(userId: string, since: number) {
-  const row = await env().DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE requested_by = ? AND dispatch_at >= ?")
-    .bind(userId, since)
+export async function countRunsForUserModelSince(userId: string, model: string, since: number) {
+  const row = await env()
+    .DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE requested_by = ? AND model = ? AND dispatch_at >= ?")
+    .bind(userId, model, since)
     .first<{ n: number }>();
   return row?.n ?? 0;
+}
+
+export async function getUserLimit(userId: string, model: string) {
+  const row = await env()
+    .DB.prepare("SELECT daily_limit FROM user_limits WHERE user_id = ? AND model = ?")
+    .bind(userId, model)
+    .first<{ daily_limit: number }>();
+  return row?.daily_limit ?? null;
+}
+
+export async function getUserLimits(userId: string) {
+  const { results } = await env()
+    .DB.prepare("SELECT model, daily_limit FROM user_limits WHERE user_id = ?")
+    .bind(userId)
+    .all<{ model: string; daily_limit: number }>();
+  return results ?? [];
+}
+
+export async function setUserLimit(userId: string, model: string, dailyLimit: number) {
+  await env()
+    .DB.prepare("INSERT INTO user_limits (user_id, model, daily_limit) VALUES (?, ?, ?) ON CONFLICT (user_id, model) DO UPDATE SET daily_limit = excluded.daily_limit")
+    .bind(userId, model, dailyLimit)
+    .run();
+}
+
+export async function removeUserLimit(userId: string, model: string) {
+  await env().DB.prepare("DELETE FROM user_limits WHERE user_id = ? AND model = ?").bind(userId, model).run();
 }
 
 const activeRunStatuses = ["dispatching", "running"];

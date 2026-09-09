@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { requireSameOrigin } from "@/lib/csrf";
 import {
+  DEFAULT_DAILY_LIMIT,
   addMessage,
   appendAuditEvent,
   countActiveRunsForProject,
-  countRequestsForUserSince,
+  countRunsForUserModelSince,
   createRun,
   getMessages,
   getRuns,
   getSession,
+  getUserLimit,
   touchSessionTitle,
   updateRun,
 } from "@/db";
@@ -28,9 +30,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const dayStart = new Date();
   dayStart.setUTCHours(0, 0, 0, 0);
-  if ((await countRequestsForUserSince(user.id, dayStart.getTime())) >= 5) {
-    return NextResponse.json({ error: "daily request limit reached" }, { status: 429 });
-  }
   if ((await countActiveRunsForProject(session.project)) >= 1) {
     return NextResponse.json({ error: "a run is already active for this project" }, { status: 409 });
   }
@@ -38,6 +37,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const cfg = projectConfig(session.project);
   const request = content.trim();
   const runModel = model?.trim() || cfg.defaultModel;
+  let limit = 0;
+  if (!user.isAdmin) {
+    limit = (await getUserLimit(user.id, runModel)) ?? DEFAULT_DAILY_LIMIT;
+    const used = await countRunsForUserModelSince(user.id, runModel, dayStart.getTime());
+    if (used >= limit) {
+      return NextResponse.json({ error: `daily limit reached for this model (${used} of ${limit} used)` }, { status: 429 });
+    }
+  }
   const mode = canWriteProject(user, session.project) ? "auto" : "ask";
   const runId = await createRun(id, session.project, request, runModel, user.id, dayStart.getTime(), mode);
   if (!runId) return NextResponse.json({ error: "request or project limit reached" }, { status: 409 });

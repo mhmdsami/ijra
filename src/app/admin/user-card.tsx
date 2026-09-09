@@ -6,18 +6,22 @@ import { deleteUserAction, saveAccessAction, setAdminAction } from "./actions";
 import { cn } from "@/lib/utils";
 
 export type Grant = { project: string; canWrite: boolean };
-export type AdminUser = { id: string; email: string; role: string | null; projects: Grant[] };
+export type AdminUser = { id: string; email: string; role: string | null; projects: Grant[]; limits: { model: string; daily_limit: number }[] };
 
 export function UserCard({
   user,
   meId,
   allProjects,
+  models,
+  defaultLimit,
   locked = false,
   viewerIsSuperAdmin = false,
 }: {
   user: AdminUser;
   meId: string;
   allProjects: string[];
+  models: readonly string[];
+  defaultLimit: number;
   locked?: boolean;
   viewerIsSuperAdmin?: boolean;
 }) {
@@ -26,13 +30,16 @@ export function UserCard({
   const canChangeRole = viewerIsSuperAdmin && !isMe;
   const canDelete = viewerIsSuperAdmin && !isMe;
   const initial = Object.fromEntries(user.projects.map((g) => [g.project, g.canWrite ? "write" : "ask"] as const));
+  const initialLimits = Object.fromEntries(user.limits.map((l) => [l.model, String(l.daily_limit)]));
   const [draft, setDraft] = useState<Record<string, "ask" | "write">>(initial);
+  const [draftLimits, setDraftLimits] = useState<Record<string, string>>(initialLimits);
   const [pending, startTransition] = useTransition();
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || JSON.stringify(draftLimits) !== JSON.stringify(initialLimits);
 
   useEffect(() => {
     setDraft(Object.fromEntries(user.projects.map((g) => [g.project, g.canWrite ? "write" : "ask"] as const)));
-  }, [user.projects]);
+    setDraftLimits(Object.fromEntries(user.limits.map((l) => [l.model, String(l.daily_limit)])));
+  }, [user.projects, user.limits]);
 
   function save() {
     const form = document.getElementById(`access-${user.id}`) as HTMLFormElement;
@@ -79,6 +86,11 @@ export function UserCard({
           {Object.entries(draft).map(([project, level]) => (
             <input key={project} type="hidden" name="grant" value={`${project}:${level}`} />
           ))}
+          {Object.entries(draftLimits)
+            .filter(([, n]) => n.trim() !== "")
+            .map(([model, n]) => (
+              <input key={model} type="hidden" name="limit" value={`${model}:${n}`} />
+            ))}
           {Object.entries(draft).map(([project, level]) => (
             <div key={project} className="flex items-center justify-between gap-3 rounded-lg bg-secondary/50 px-2.5 py-1.5">
               <span className="text-xs">{project}</span>
@@ -121,6 +133,25 @@ export function UserCard({
               ))}
             </select>
           )}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">daily limits</span>
+            {models.map((m) => (
+              <label key={m} className="flex items-center gap-1 rounded-lg bg-secondary/50 px-2 py-1">
+                <span className="text-[10px] text-muted-foreground">{m}</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={draftLimits[m] ?? ""}
+                  onChange={(e) => setDraftLimits((d) => ({ ...d, [m]: e.target.value }))}
+                  placeholder={String(defaultLimit)}
+                  className="h-5 w-12 rounded-md border border-border bg-card px-1 text-center text-[10px] outline-none focus:border-primary/60"
+                  aria-label={`Daily limit for ${m}`}
+                />
+              </label>
+            ))}
+            <span className="text-[10px] text-muted-foreground">blank = {defaultLimit}</span>
+          </div>
           {Object.keys(draft).length === 0 && allProjects.length === 0 && (
             <p className="text-[11px] text-muted-foreground">No projects configured.</p>
           )}
