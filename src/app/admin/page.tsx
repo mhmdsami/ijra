@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { guardAdmin, usersWithGrants } from "./actions";
 import { UserList } from "./user-list";
 import { DEFAULT_DAILY_LIMIT, getSuperAdminId } from "@/db";
-import { MODELS, projects } from "@/lib/projects";
+import { projects } from "@/lib/projects";
 import { HeaderActions } from "../header-actions";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,6 @@ export default async function AdminPage() {
           users={users}
           meId={admin.id}
           allProjects={ALL_PROJECTS}
-          models={MODELS}
           defaultLimit={DEFAULT_DAILY_LIMIT}
           superAdminId={superAdminId}
         />

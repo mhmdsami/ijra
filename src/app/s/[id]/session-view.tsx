@@ -146,6 +146,7 @@ export function SessionView({ initial }: { initial: State }) {
             </div>
             <p className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">
               <span>Enter to send</span>
+              <Quota refreshKey={state.runs.length} />
               <span className="ml-auto">
                 <ComposerControls
                   model={model}
@@ -153,7 +154,6 @@ export function SessionView({ initial }: { initial: State }) {
                   onSend={send}
                   busy={sending}
                   disabled={!input.trim()}
-                  quotaKey={state.runs.length}
                 />
               </span>
             </p>
@@ -162,6 +162,20 @@ export function SessionView({ initial }: { initial: State }) {
       </div>
     </div>
   );
+}
+
+function Quota({ refreshKey }: { refreshKey?: number }) {
+  const [quota, setQuota] = useState<{ used: number; limit: number | null } | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/quota")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((q) => { if (live && q) setQuota(q as { used: number; limit: number | null }); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [refreshKey]);
+  if (!quota || quota.limit === null) return null;
+  return <span>{quota.used}/{quota.limit} used today</span>;
 }
 
 function Message({ role, content }: { role: string; content: string }) {

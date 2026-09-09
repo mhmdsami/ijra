@@ -8,7 +8,7 @@ import {
   DEFAULT_DAILY_LIMIT,
   deleteUserRow,
   getSuperAdminId,
-  getUserLimits,
+  getUserLimit,
   getUserProjects,
   listUsers,
   removeUserLimit,
@@ -35,18 +35,12 @@ export async function saveAccessAction(formData: FormData) {
   const current = await getUserProjects(userId);
   for (const [project, level] of desired) await setUserProject(userId, project, level === "write");
   for (const { project } of current) if (!desired.has(project)) await removeUserProject(userId, project);
-  const desiredLimits = new Map<string, number>();
-  for (const raw of formData.getAll("limit").map(String)) {
-    const i = raw.lastIndexOf(":");
-    const model = raw.slice(0, i);
-    const n = Number.parseInt(raw.slice(i + 1), 10);
-    if ((MODELS as readonly string[]).includes(model) && Number.isInteger(n) && n > 0 && n <= 1000) desiredLimits.set(model, n);
+  const rawLimit = String(formData.get("limit") ?? "").trim();
+  if (rawLimit === "") await removeUserLimit(userId);
+  else {
+    const n = Number.parseInt(rawLimit, 10);
+    if (Number.isInteger(n) && n > 0 && n <= 1000) await setUserLimit(userId, n);
   }
-  const currentLimits = await getUserLimits(userId);
-  for (const [model, n] of desiredLimits) {
-    if (currentLimits.find((l) => l.model === model)?.daily_limit !== n) await setUserLimit(userId, model, n);
-  }
-  for (const { model } of currentLimits) if (!desiredLimits.has(model)) await removeUserLimit(userId, model);
   revalidatePath("/admin");
 }
 
@@ -84,5 +78,5 @@ export async function guardAdmin() {
 
 export async function usersWithGrants() {
   const users = await listUsers();
-  return Promise.all(users.map(async (u) => ({ ...u, projects: await getUserProjects(u.id), limits: await getUserLimits(u.id) })));
+  return Promise.all(users.map(async (u) => ({ ...u, projects: await getUserProjects(u.id), limit: await getUserLimit(u.id) })));
 }

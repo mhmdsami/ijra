@@ -2,6 +2,7 @@ import { listSessionsForUser, type SessionRowWithStatus } from "@/db";
 import { requireUser } from "@/lib/user";
 import { projects } from "@/lib/projects";
 import { ThreadsSidebar } from "@/components/threads-sidebar";
+import { MobileThreads } from "@/components/mobile-threads";
 import { NewRequest } from "./new-request";
 import { HeaderActions } from "./header-actions";
 import Link from "next/link";
@@ -19,6 +20,7 @@ export default async function Home() {
         <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
           <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
           <div className="flex items-center gap-1">
+            <MobileThreads sessions={sessions} />
             <HeaderActions />
           </div>
         </header>
@@ -38,6 +40,9 @@ export default async function Home() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
           <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
+          <div className="flex items-center gap-1 md:hidden">
+            <MobileThreads sessions={sessions} />
+          </div>
           <div className="flex items-center gap-1">
             {user.isAdmin && <Link href="/admin" className="rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">Users</Link>}
             <HeaderActions />

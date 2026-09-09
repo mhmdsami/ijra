@@ -5,7 +5,7 @@ import {
   addMessage,
   appendAuditEvent,
   countActiveRunsForProject,
-  countRunsForUserModelSince,
+  countRunsForUserSince,
   createRun,
   getMessages,
   getRuns,
@@ -40,12 +40,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!(MODELS as readonly string[]).includes(runModel)) {
     return NextResponse.json({ error: "unknown model" }, { status: 400 });
   }
-  let limit = 0;
   if (!user.isAdmin) {
-    limit = (await getUserLimit(user.id, runModel)) ?? DEFAULT_DAILY_LIMIT;
-    const used = await countRunsForUserModelSince(user.id, runModel, dayStart.getTime());
+    const limit = (await getUserLimit(user.id)) ?? DEFAULT_DAILY_LIMIT;
+    const used = await countRunsForUserSince(user.id, dayStart.getTime());
     if (used >= limit) {
-      return NextResponse.json({ error: `daily limit reached for this model (${used} of ${limit} used)` }, { status: 429 });
+      return NextResponse.json({ error: `daily limit reached (${used} of ${limit} requests today)` }, { status: 429 });
     }
   }
   const mode = canWriteProject(user, session.project) ? "auto" : "ask";

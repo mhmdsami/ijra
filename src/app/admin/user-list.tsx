@@ -8,14 +8,12 @@ export function UserList({
   meId,
   allProjects,
   superAdminId,
-  models,
   defaultLimit,
 }: {
   users: AdminUser[];
   meId: string;
   allProjects: string[];
   superAdminId: string | undefined;
-  models: readonly string[];
   defaultLimit: number;
 }) {
   const [q, setQ] = useState("");
@@ -36,7 +34,6 @@ export function UserList({
           user={user}
           meId={meId}
           allProjects={allProjects}
-          models={models}
           defaultLimit={defaultLimit}
           locked={user.id === superAdminId}
           viewerIsSuperAdmin={meId === superAdminId}

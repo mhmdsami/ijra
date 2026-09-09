@@ -185,39 +185,28 @@ export async function appendAuditEvent(input: {
     .run();
 }
 
-export async function countRunsForUserModelSince(userId: string, model: string, since: number) {
+export async function countRunsForUserSince(userId: string, since: number) {
   const row = await env()
-    .DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE requested_by = ? AND model = ? AND dispatch_at >= ?")
-    .bind(userId, model, since)
+    .DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE requested_by = ? AND dispatch_at >= ?")
+    .bind(userId, since)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
-export async function getUserLimit(userId: string, model: string) {
-  const row = await env()
-    .DB.prepare("SELECT daily_limit FROM user_limits WHERE user_id = ? AND model = ?")
-    .bind(userId, model)
-    .first<{ daily_limit: number }>();
+export async function getUserLimit(userId: string) {
+  const row = await env().DB.prepare("SELECT daily_limit FROM user_limits WHERE user_id = ?").bind(userId).first<{ daily_limit: number }>();
   return row?.daily_limit ?? null;
 }
 
-export async function getUserLimits(userId: string) {
-  const { results } = await env()
-    .DB.prepare("SELECT model, daily_limit FROM user_limits WHERE user_id = ?")
-    .bind(userId)
-    .all<{ model: string; daily_limit: number }>();
-  return results ?? [];
-}
-
-export async function setUserLimit(userId: string, model: string, dailyLimit: number) {
+export async function setUserLimit(userId: string, dailyLimit: number) {
   await env()
-    .DB.prepare("INSERT INTO user_limits (user_id, model, daily_limit) VALUES (?, ?, ?) ON CONFLICT (user_id, model) DO UPDATE SET daily_limit = excluded.daily_limit")
-    .bind(userId, model, dailyLimit)
+    .DB.prepare("INSERT INTO user_limits (user_id, daily_limit) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET daily_limit = excluded.daily_limit")
+    .bind(userId, dailyLimit)
     .run();
 }
 
-export async function removeUserLimit(userId: string, model: string) {
-  await env().DB.prepare("DELETE FROM user_limits WHERE user_id = ? AND model = ?").bind(userId, model).run();
+export async function removeUserLimit(userId: string) {
+  await env().DB.prepare("DELETE FROM user_limits WHERE user_id = ?").bind(userId).run();
 }
 
 const activeRunStatuses = ["dispatching", "running"];
