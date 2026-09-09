@@ -14,10 +14,11 @@ export function projects() {
     .map(([id, cfg]) => ({ id, cfg }));
 }
 
-export const MODELS = ["omen-alpha", "glm-5.3-flash"] as const;
+export const MODELS = ["omen-alpha", "muse-spark-1.3-contributor", "deepseek-v4-flash"] as const;
 export const MODEL_LABELS: Record<string, string> = {
   "omen-alpha": "Omen Alpha",
-  "glm-5.3-flash": "GLM 5.3 Flash",
+  "muse-spark-1.3-contributor": "Muse Spark 1.3 Contributor",
+  "deepseek-v4-flash": "DeepSeek V4 Flash",
 };
 
 export function projectConfig(id: string) {

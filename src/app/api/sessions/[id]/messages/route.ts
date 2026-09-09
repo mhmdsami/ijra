@@ -14,7 +14,7 @@ import {
   touchSessionTitle,
   updateRun,
 } from "@/db";
-import { projectConfig } from "@/lib/projects";
+import { projectConfig, MODELS } from "@/lib/projects";
 import { startRun } from "@/lib/runner";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
 
@@ -37,6 +37,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const cfg = projectConfig(session.project);
   const request = content.trim();
   const runModel = model?.trim() || cfg.defaultModel;
+  if (!(MODELS as readonly string[]).includes(runModel)) {
+    return NextResponse.json({ error: "unknown model" }, { status: 400 });
+  }
   let limit = 0;
   if (!user.isAdmin) {
     limit = (await getUserLimit(user.id, runModel)) ?? DEFAULT_DAILY_LIMIT;

@@ -24,7 +24,8 @@
     "defaultModel": "omen-alpha",
     "allowedModels": [
       "omen-alpha",
-      "glm-5.3-flash"
+      "muse-spark-1.3-contributor",
+      "deepseek-v4-flash"
     ]
   }
 }
