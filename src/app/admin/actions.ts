@@ -6,6 +6,9 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth-server";
 import {
   DEFAULT_DAILY_LIMIT,
+  addModel as addModelRow,
+  removeModel as removeModelRow,
+  setDefaultModel as setDefaultModelRow,
   deleteUserRow,
   getSuperAdminId,
   getUserLimit,
@@ -17,7 +20,7 @@ import {
   setUserProject,
 } from "@/db";
 import { requireUser } from "@/lib/user";
-import { MODELS, projects } from "@/lib/projects";
+import { projects } from "@/lib/projects";
 
 export async function saveAccessAction(formData: FormData) {
   const admin = await requireUser();
@@ -79,4 +82,35 @@ export async function guardAdmin() {
 export async function usersWithGrants() {
   const users = await listUsers();
   return Promise.all(users.map(async (u) => ({ ...u, projects: await getUserProjects(u.id), limit: await getUserLimit(u.id) })));
+}
+
+export async function addModelAction(formData: FormData) {
+  const admin = await requireUser();
+  if (!admin.isAdmin) return;
+  const id = String(formData.get("id") ?? "").trim();
+  const label = String(formData.get("label") ?? "").trim() || id;
+  if (!id) return;
+  await addModelRow(id, label, formData.get("vision") === "1");
+  revalidatePath("/admin/models");
+  revalidatePath("/");
+}
+
+export async function removeModelAction(formData: FormData) {
+  const admin = await requireUser();
+  if (!admin.isAdmin) return;
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+  await removeModelRow(id);
+  revalidatePath("/admin/models");
+  revalidatePath("/");
+}
+
+export async function setDefaultModelAction(formData: FormData) {
+  const admin = await requireUser();
+  if (!admin.isAdmin) return;
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) return;
+  await setDefaultModelRow(id);
+  revalidatePath("/admin/models");
+  revalidatePath("/");
 }

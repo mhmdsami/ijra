@@ -44,6 +44,52 @@ export interface RunRow {
   decision_reason: string | null;
 }
 
+export interface ModelRow {
+  id: string;
+  label: string;
+  vision: number;
+  is_default: number;
+  sort: number;
+}
+
+export async function listModels() {
+  const { results } = await env().DB.prepare("SELECT * FROM models ORDER BY sort, id").all<ModelRow>();
+  return results ?? [];
+}
+
+export async function getModel(id: string) {
+  return env().DB.prepare("SELECT * FROM models WHERE id = ?").bind(id).first<ModelRow>();
+}
+
+export async function getDefaultModel() {
+  const row = await env().DB.prepare("SELECT id FROM models WHERE is_default = 1 ORDER BY sort LIMIT 1").first<{ id: string }>();
+  if (row) return row.id;
+  const first = await env().DB.prepare("SELECT id FROM models ORDER BY sort, id LIMIT 1").first<{ id: string }>();
+  return first?.id ?? null;
+}
+
+export async function addModel(id: string, label: string, vision: boolean) {
+  const row = await env().DB.prepare("SELECT COALESCE(MAX(sort), -1) AS m FROM models").first<{ m: number }>();
+  await env()
+    .DB.prepare("INSERT INTO models (id, label, vision, is_default, sort) VALUES (?, ?, ?, 0, ?) ON CONFLICT (id) DO UPDATE SET label = excluded.label, vision = excluded.vision")
+    .bind(id, label, vision ? 1 : 0, (row?.m ?? -1) + 1)
+    .run();
+}
+
+export async function removeModel(id: string) {
+  const model = await getModel(id);
+  if (!model) return;
+  await env().DB.prepare("DELETE FROM models WHERE id = ?").bind(id).run();
+  if (model.is_default === 1) {
+    const next = await env().DB.prepare("SELECT id FROM models ORDER BY sort, id LIMIT 1").first<{ id: string }>();
+    if (next) await setDefaultModel(next.id);
+  }
+}
+
+export async function setDefaultModel(id: string) {
+  await env().DB.prepare("UPDATE models SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END").bind(id).run();
+}
+
 export interface AuditEventRow {
   id: number;
   run_id: string | null;

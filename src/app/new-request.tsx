@@ -4,13 +4,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { ComposerControls } from "@/components/composer-controls";
-import { MODELS } from "@/lib/projects";
 
-export function NewRequest({ projects }: { projects: string[] }) {
+export function NewRequest({ projects, models, defaultModel }: { projects: string[]; models: { id: string; label: string }[]; defaultModel: string }) {
   const router = useRouter();
   const [project, setProject] = useState("");
   const [content, setContent] = useState("");
-  const [model, setModel] = useState<string>(MODELS[0]);
+  const [model, setModel] = useState<string>(defaultModel);
   const [busy, setBusy] = useState(false);
 
   async function create() {
@@ -56,6 +55,7 @@ export function NewRequest({ projects }: { projects: string[] }) {
         </select>
         <ComposerControls
           model={model}
+          models={models}
           onModel={setModel}
           onSend={create}
           busy={busy}

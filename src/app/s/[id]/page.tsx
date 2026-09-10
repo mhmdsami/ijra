@@ -1,4 +1,4 @@
-import { getMessages, getOwnerEmail, getRuns, getSession, listSessionsForUser } from "@/db";
+import { getDefaultModel, getMessages, getOwnerEmail, getRuns, getSession, listModels, listSessionsForUser } from "@/db";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
 import { notFound } from "next/navigation";
 import { SessionView } from "./session-view";
@@ -11,12 +11,15 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const session = await getSession(id);
   if (!session || !canAccessSession(user, session)) notFound();
 
-  const [messages, runs, sessions, ownerEmail] = await Promise.all([
+  const [messages, runs, sessions, ownerEmail, modelRows, defaultModel] = await Promise.all([
     getMessages(id),
     getRuns(id),
     listSessionsForUser(user.id, user.allowedProjects),
     session.owner_id && session.owner_id !== user.id ? getOwnerEmail(session.owner_id) : Promise.resolve(null),
+    listModels(),
+    getDefaultModel(),
   ]);
+  const models = modelRows.map((m) => ({ id: m.id, label: m.label }));
   return (
     <SessionView
       initial={{
@@ -28,6 +31,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         viewerId: user.id,
         canWrite: canWriteProject(user, session.project),
         canDecide: user.isAdmin || session.owner_id === user.id,
+        models,
+        defaultModel: defaultModel ?? models[0]?.id ?? "",
       }}
     />
   );

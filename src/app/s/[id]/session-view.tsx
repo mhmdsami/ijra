@@ -13,17 +13,17 @@ import { HeaderActions } from "../../header-actions";
 import { ThreadsSidebar } from "@/components/threads-sidebar";
 import { MobileThreads } from "@/components/mobile-threads";
 import { ComposerControls } from "@/components/composer-controls";
-import { MODELS, MODEL_LABELS, projectConfig } from "@/lib/projects";
+import { projectConfig } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import type { MessageRow, RunRow, SessionRow, SessionRowWithStatus } from "@/db";
 
-type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; sessions: SessionRowWithStatus[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; canDecide: boolean };
+type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; sessions: SessionRowWithStatus[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; canDecide: boolean; models: { id: string; label: string }[]; defaultModel: string };
 const ACTIVE = new Set(["dispatching", "running"]);
 
 export function SessionView({ initial }: { initial: State }) {
   const [state, setState] = useState(initial);
   const [input, setInput] = useState("");
-    const [model, setModel] = useState<string>(MODELS[0]);
+    const [model, setModel] = useState<string>(initial.defaultModel);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -152,6 +152,7 @@ export function SessionView({ initial }: { initial: State }) {
               <span className="ml-auto">
                 <ComposerControls
                   model={model}
+                  models={state.models}
                   onModel={setModel}
                   onSend={send}
                   busy={sending}

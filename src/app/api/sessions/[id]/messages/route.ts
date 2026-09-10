@@ -14,7 +14,7 @@ import {
   touchSessionTitle,
   updateRun,
 } from "@/db";
-import { projectConfig, MODELS } from "@/lib/projects";
+import { getDefaultModel, getModel } from "@/db";
 import { startRun } from "@/lib/runner";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
 
@@ -34,10 +34,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "a run is already active for this project" }, { status: 409 });
   }
 
-  const cfg = projectConfig(session.project);
   const request = content.trim();
-  const runModel = model?.trim() || cfg.defaultModel;
-  if (!(MODELS as readonly string[]).includes(runModel)) {
+  const runModel = model?.trim() || (await getDefaultModel()) || "";
+  if (!(await getModel(runModel))) {
     return NextResponse.json({ error: "unknown model" }, { status: 400 });
   }
   if (!user.isAdmin) {

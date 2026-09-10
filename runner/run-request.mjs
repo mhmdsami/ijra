@@ -183,7 +183,6 @@ if (cfg.enabled === false) die(`Project "${PROJECT}" is not enabled yet`);
 const session = SESSION || `ts${Date.now().toString(36)}`;
 const model = MODEL || cfg.defaultModel;
 if (MODE !== "fix" && MODE !== "ask" && MODE !== "auto") die(`Unknown mode "${MODE}"`);
-if (cfg.allowedModels && !cfg.allowedModels.includes(model)) die(`Model "${model}" is not allowed for ${PROJECT}`);
 const artifacts = resolve(here, "../artifacts");
 mkdirSync(artifacts, { recursive: true });
 

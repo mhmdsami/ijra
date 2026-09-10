@@ -1,16 +1,18 @@
 "use client";
 
 import { ArrowUp, Loader2 } from "lucide-react";
-import { MODELS, MODEL_LABELS } from "@/lib/projects";
+
 
 export function ComposerControls({
   model,
+  models,
   onModel,
   onSend,
   busy,
   disabled,
 }: {
   model: string;
+  models: { id: string; label: string }[];
   onModel: (m: string) => void;
   onSend: () => void;
   busy?: boolean;
@@ -24,9 +26,9 @@ export function ComposerControls({
         className="cursor-pointer appearance-none rounded-full py-1.5 pl-3 pr-1 text-[10px] tracking-wide text-foreground/60 outline-none hover:text-foreground"
         aria-label="Model"
       >
-        {MODELS.map((m) => (
-          <option key={m} value={m} className="bg-background text-foreground">
-            {MODEL_LABELS[m] ?? m}
+        {models.map((m) => (
+          <option key={m.id} value={m.id} className="bg-background text-foreground">
+            {m.label}
           </option>
         ))}
       </select>

@@ -21,11 +21,6 @@
       "src/**",
       "public/**"
     ],
-    "defaultModel": "deepseek-flash",
-    "allowedModels": [
-      "deepseek-flash",
-      "muse-spark-1.3-contributor",
-      "deepseek-v4-flash"
-    ]
+    "defaultModel": "deepseek-flash"
   }
 }

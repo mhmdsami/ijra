@@ -1,4 +1,4 @@
-import { listSessionsForUser, type SessionRowWithStatus } from "@/db";
+import { getDefaultModel, listModels, listSessionsForUser, type SessionRowWithStatus } from "@/db";
 import { requireUser } from "@/lib/user";
 import { projects } from "@/lib/projects";
 import { ThreadsSidebar } from "@/components/threads-sidebar";
@@ -12,6 +12,8 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   const user = await requireUser();
   const sessions = await listSessionsForUser(user.id, user.allowedProjects);
+  const [modelRows, defaultModel] = await Promise.all([listModels(), getDefaultModel()]);
+  const models = modelRows.map((m) => ({ id: m.id, label: m.label }));
   const projectIds = user.allowedProjects ?? projects().map((p) => p.id);
 
   if (projectIds.length === 0) {
@@ -58,7 +60,7 @@ export default async function Home() {
               <p className="animate-fade-up mt-4 max-w-md text-sm leading-6 text-muted-foreground [animation-delay:40ms]">Start with the change you need. ijra will work in your repo and open a pull request.</p>
             </div>
             <div className="animate-fade-up mt-8 [animation-delay:80ms]">
-              <NewRequest projects={projectIds} />
+              <NewRequest projects={projectIds} models={models} defaultModel={defaultModel ?? models[0]?.id ?? ""} />
             </div>
           </div>
         </section>
