@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { guardAdmin } from "../actions";
-import { listModels } from "@/db";
+import { listModels, modelUsage } from "@/db";
 import { HeaderActions } from "../../header-actions";
-import { ModelRow } from "./model-row";
+import { AdminNav } from "@/components/admin-nav";
+import { ModelCatalog, type CatalogItem } from "./model-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +28,19 @@ async function catalog(): Promise<CatalogModel[]> {
 
 export default async function ModelsPage() {
   await guardAdmin();
-  const [enabled, listing] = await Promise.all([listModels(), catalog()]);
+  const [enabled, listing, usage] = await Promise.all([listModels(), catalog(), modelUsage()]);
   const enabledIds = new Set(enabled.map((m) => m.id));
   const defaultId = enabled.find((m) => m.is_default === 1)?.id ?? enabled[0]?.id ?? "";
-  const available = listing.filter((m) => !enabledIds.has(m.id));
-  const missing = enabled.filter((m) => !listing.some((c) => c.id === m.id));
+
+  const enabledItems: CatalogItem[] = enabled
+    .filter((m) => listing.some((c) => c.id === m.id))
+    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true }));
+  const missing: CatalogItem[] = enabled
+    .filter((m) => !listing.some((c) => c.id === m.id))
+    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true, stale: true }));
+  const available: CatalogItem[] = listing
+    .filter((m) => !enabledIds.has(m.id))
+    .map((m) => ({ id: m.id, label: m.name, vision: m.vision, isDefault: false, enabled: false }));
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -40,9 +49,8 @@ export default async function ModelsPage() {
           <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
           <span className="text-2xl italic tracking-[-0.07em] text-foreground" style={{ fontFamily: "var(--font-display)" }}>ijra</span>
         </Link>
-        <div className="flex items-center gap-1">
-          <Link href="/admin" className="rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">Users</Link>
-          <Link href="/admin/models" className="rounded-sm bg-secondary px-2 py-1 text-xs text-foreground">Models</Link>
+        <div className="flex items-center gap-2">
+          <AdminNav />
           <HeaderActions />
         </div>
       </header>
@@ -51,31 +59,15 @@ export default async function ModelsPage() {
         <div className="mb-1">
           <h1 className="text-lg text-foreground">Models</h1>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Enabled models show up in the composer. The catalog comes from models.dev, so new models appear without a deploy.
+            Enabled models show up in the composer. Sorting is by usage.
           </p>
         </div>
 
-        <h2 className="mt-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Enabled</h2>
-        {enabled.length === 0 && <p className="text-xs text-muted-foreground">No models enabled. Add one below.</p>}
-        {enabled.map((m) => (
-          <ModelRow key={m.id} model={{ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true }} />
-        ))}
-
-        <h2 className="mt-4 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Available</h2>
-        {available.length === 0 && listing.length > 0 && <p className="text-xs text-muted-foreground">Everything in the catalog is enabled.</p>}
-        {listing.length === 0 && <p className="text-xs text-muted-foreground">Could not reach the model catalog. Try again shortly.</p>}
-        {available.map((m) => (
-          <ModelRow key={m.id} model={{ id: m.id, label: m.name, vision: m.vision, isDefault: false, enabled: false }} />
-        ))}
-
-        {missing.length > 0 && (
-          <>
-            <h2 className="mt-4 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Enabled, not in catalog</h2>
-            {missing.map((m) => (
-              <ModelRow key={m.id} model={{ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true }} stale />
-            ))}
-          </>
+        {listing.length === 0 && enabled.length === 0 && (
+          <p className="text-xs text-muted-foreground">Could not reach the model catalog. Try again shortly.</p>
         )}
+
+        <ModelCatalog enabled={enabledItems} available={available} missing={missing} usage={usage} />
       </div>
     </div>
   );

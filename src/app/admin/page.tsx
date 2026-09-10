@@ -5,6 +5,7 @@ import { UserList } from "./user-list";
 import { DEFAULT_DAILY_LIMIT, getSuperAdminId } from "@/db";
 import { projects } from "@/lib/projects";
 import { HeaderActions } from "../header-actions";
+import { AdminNav } from "@/components/admin-nav";
 
 export const dynamic = "force-dynamic";
 const ALL_PROJECTS = projects().map((project) => project.id);
@@ -20,9 +21,8 @@ export default async function AdminPage() {
           <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
           <span className="text-2xl italic tracking-[-0.07em] text-foreground" style={{ fontFamily: "var(--font-display)" }}>ijra</span>
         </Link>
-        <div className="flex items-center gap-1">
-          {admin.isAdmin && <Link href="/admin" className="rounded-sm bg-secondary px-2 py-1 text-xs text-foreground">Users</Link>}
-          {admin.isAdmin && <Link href="/admin/models" className="rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">Models</Link>}
+        <div className="flex items-center gap-2">
+          {admin.isAdmin && <AdminNav />}
           <HeaderActions />
         </div>
       </header>

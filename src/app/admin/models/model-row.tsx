@@ -4,11 +4,22 @@ import { useTransition } from "react";
 import { addModelAction, removeModelAction, setDefaultModelAction } from "../actions";
 import { cn } from "@/lib/utils";
 
+function lastUsed(ts: number | null | undefined) {
+  if (!ts) return "never used";
+  const mins = Math.max(0, Math.round((Date.now() - ts) / 60_000));
+  if (mins < 60) return `used ${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 48) return `used ${hours}h ago`;
+  return `used ${Math.round(hours / 24)}d ago`;
+}
+
 export function ModelRow({
   model,
+  usage,
   stale = false,
 }: {
   model: { id: string; label: string; vision: boolean; isDefault: boolean; enabled: boolean };
+  usage?: { runs: number; users: number; last: number | null };
   stale?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -28,6 +39,8 @@ export function ModelRow({
           {model.vision && " · images"}
           {model.isDefault && " · default"}
           {stale && " · not in catalog"}
+          {" · "}
+          {usage ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last)}` : lastUsed(null)}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">

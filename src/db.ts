@@ -63,6 +63,19 @@ async function writeModels(models: ModelRow[]) {
   await env().DB.prepare("INSERT INTO settings (key, value) VALUES ('models', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value").bind(value).run();
 }
 
+export interface ModelUsage {
+  runs: number;
+  users: number;
+  last: number | null;
+}
+
+export async function modelUsage() {
+  const { results } = await env()
+    .DB.prepare("SELECT model, COUNT(*) AS runs, COUNT(DISTINCT requested_by) AS users, MAX(dispatch_at) AS last FROM runs GROUP BY model")
+    .all<{ model: string; runs: number; users: number; last: number | null }>();
+  return Object.fromEntries((results ?? []).map((r) => [r.model, { runs: r.runs, users: r.users, last: r.last }])) as Record<string, ModelUsage>;
+}
+
 export async function listModels() {
   return readModels();
 }
