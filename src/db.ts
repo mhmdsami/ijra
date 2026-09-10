@@ -49,45 +49,50 @@ export interface ModelRow {
   label: string;
   vision: number;
   is_default: number;
-  sort: number;
+}
+
+async function readModels(): Promise<ModelRow[]> {
+  const row = await env().DB.prepare("SELECT value FROM settings WHERE key = 'models'").first<{ value: string }>();
+  if (!row) return [];
+  const parsed = JSON.parse(row.value) as { id: string; label: string; vision?: boolean; default?: boolean }[];
+  return parsed.map((m) => ({ id: m.id, label: m.label, vision: m.vision ? 1 : 0, is_default: m.default ? 1 : 0 }));
+}
+
+async function writeModels(models: ModelRow[]) {
+  const value = JSON.stringify(models.map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, default: m.is_default === 1 })));
+  await env().DB.prepare("INSERT INTO settings (key, value) VALUES ('models', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value").bind(value).run();
 }
 
 export async function listModels() {
-  const { results } = await env().DB.prepare("SELECT * FROM models ORDER BY sort, id").all<ModelRow>();
-  return results ?? [];
+  return readModels();
 }
 
 export async function getModel(id: string) {
-  return env().DB.prepare("SELECT * FROM models WHERE id = ?").bind(id).first<ModelRow>();
+  return (await readModels()).find((m) => m.id === id) ?? null;
 }
 
 export async function getDefaultModel() {
-  const row = await env().DB.prepare("SELECT id FROM models WHERE is_default = 1 ORDER BY sort LIMIT 1").first<{ id: string }>();
-  if (row) return row.id;
-  const first = await env().DB.prepare("SELECT id FROM models ORDER BY sort, id LIMIT 1").first<{ id: string }>();
-  return first?.id ?? null;
+  const models = await readModels();
+  return (models.find((m) => m.is_default === 1) ?? models[0])?.id ?? null;
 }
 
 export async function addModel(id: string, label: string, vision: boolean) {
-  const row = await env().DB.prepare("SELECT COALESCE(MAX(sort), -1) AS m FROM models").first<{ m: number }>();
-  await env()
-    .DB.prepare("INSERT INTO models (id, label, vision, is_default, sort) VALUES (?, ?, ?, 0, ?) ON CONFLICT (id) DO UPDATE SET label = excluded.label, vision = excluded.vision")
-    .bind(id, label, vision ? 1 : 0, (row?.m ?? -1) + 1)
-    .run();
+  const models = await readModels();
+  if (models.some((m) => m.id === id)) return;
+  await writeModels([...models, { id, label, vision: vision ? 1 : 0, is_default: models.length === 0 ? 1 : 0 }]);
 }
 
 export async function removeModel(id: string) {
-  const model = await getModel(id);
-  if (!model) return;
-  await env().DB.prepare("DELETE FROM models WHERE id = ?").bind(id).run();
-  if (model.is_default === 1) {
-    const next = await env().DB.prepare("SELECT id FROM models ORDER BY sort, id LIMIT 1").first<{ id: string }>();
-    if (next) await setDefaultModel(next.id);
-  }
+  const models = await readModels();
+  const wasDefault = models.find((m) => m.id === id)?.is_default === 1;
+  const next = models.filter((m) => m.id !== id);
+  if (wasDefault && next.length > 0) next[0] = { ...next[0], is_default: 1 };
+  await writeModels(next);
 }
 
 export async function setDefaultModel(id: string) {
-  await env().DB.prepare("UPDATE models SET is_default = CASE WHEN id = ? THEN 1 ELSE 0 END").bind(id).run();
+  const models = await readModels();
+  await writeModels(models.map((m) => ({ ...m, is_default: m.id === id ? 1 : 0 })));
 }
 
 export interface AuditEventRow {
