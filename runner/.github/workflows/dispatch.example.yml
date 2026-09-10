@@ -20,7 +20,7 @@ on:
         description: "opencode-go model id"
         required: false
         type: string
-        default: "omen-alpha"
+        default: "deepseek-flash"
       mode:
         description: "auto lets the agent decide; ask forces read-only answers"
         required: false
