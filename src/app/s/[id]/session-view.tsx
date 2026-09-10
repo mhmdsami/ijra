@@ -101,9 +101,11 @@ export function SessionView({ initial }: { initial: State }) {
       <ThreadsSidebar sessions={state.sessions} showOwner={state.session.owner_id !== state.viewerId || state.sessions.some((s) => s.owner_id !== state.viewerId)} />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-          <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
           <div className="flex items-center gap-2">
             <MobileThreads sessions={state.sessions} />
+            <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
+          </div>
+          <div className="flex items-center gap-2">
             <Link
               href={`https://github.com/${projectConfig(state.session.project).repo}`}
               target="_blank"

@@ -18,9 +18,11 @@ export default async function Home() {
     return (
       <div className="flex min-h-dvh flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-          <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <MobileThreads sessions={sessions} />
+            <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
+          </div>
+          <div className="flex items-center gap-1">
             <HeaderActions />
           </div>
         </header>
@@ -39,9 +41,9 @@ export default async function Home() {
       <ThreadsSidebar sessions={sessions} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-          <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
-          <div className="flex items-center gap-1 md:hidden">
+          <div className="flex items-center gap-2">
             <MobileThreads sessions={sessions} />
+            <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
           </div>
           <div className="flex items-center gap-1">
             {user.isAdmin && <Link href="/admin" className="rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">Users</Link>}
