@@ -18,6 +18,14 @@ import { getDefaultModel, getModel } from "@/db";
 import { startRun } from "@/lib/runner";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
 
+function titleFrom(request: string) {
+  const flat = request.replace(/\s+/g, " ").trim();
+  if (flat.length <= 60) return flat;
+  const cut = flat.slice(0, 60);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${cut.slice(0, lastSpace > 20 ? lastSpace : 60)}…`;
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { content, model } = (await req.json()) as { content?: string; model?: string };
@@ -51,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!runId) return NextResponse.json({ error: "request or project limit reached" }, { status: 409 });
 
   await addMessage(id, "user", request);
-  await touchSessionTitle(id, request.split("\n")[0].slice(0, 80));
+  await touchSessionTitle(id, titleFrom(request));
   await appendAuditEvent({
     sessionId: id,
     runId,
