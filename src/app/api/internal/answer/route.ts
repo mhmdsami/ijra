@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   await env().DB.prepare("DELETE FROM runner_callbacks WHERE received_at < ?").bind(Date.now() - 24 * 60 * 60_000).run();
   const run = await getRun(payload.runId);
   if (!run) return NextResponse.json({ error: "unknown run" }, { status: 404 });
-  if (!["dispatching", "running"].includes(run.status)) return NextResponse.json({ error: "invalid run transition" }, { status: 409 });
+  if (!["dispatching", "running", "failed"].includes(run.status)) return NextResponse.json({ error: "invalid run transition" }, { status: 409 });
   const status = ["answered", "no_changes", "awaiting_review", "failed"].includes(payload.status) ? payload.status : "failed";
   const summary = payload.summary?.trim();
   await updateRun(run.id, { status, pr_url: payload.outcome?.prUrl ?? null, branch: payload.outcome?.branch ?? null, agent_msg: summary ? 1 : 0, policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed", policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []) });
