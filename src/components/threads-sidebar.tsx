@@ -1,7 +1,7 @@
 "use client";
 
 import { MessageSquarePlus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +11,16 @@ import { cn } from "@/lib/utils";
 export function ThreadsSidebar() {
   const { sessions, showOwner } = useSessions();
   const [open, setOpen] = useState(true);
+  const [pending, setPending] = useState<string | null>(null);
   const pathname = usePathname();
 
   useEffect(() => {
     if (localStorage.getItem("ijra-sidebar") === "0") setOpen(false);
   }, []);
+
+  useEffect(() => {
+    setPending(null);
+  }, [pathname]);
 
   function toggle() {
     setOpen((v) => {
@@ -55,30 +60,45 @@ export function ThreadsSidebar() {
           <p className="px-2 py-3 text-xs leading-5 text-muted-foreground">Your requests will appear here.</p>
         ) : (
           <ul>
-            {sessions.map((session) => (
-              <li key={session.id}>
-                <Link
-                  href={`/s/${session.id}`}
-                  className={cn(
-                    "animate-fade-up block rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary",
-                    pathname === `/s/${session.id}` && "bg-secondary"
-                  )}
-                >
-                  <div className="truncate text-xs text-foreground">
-                    {session.title || "Untitled request"}
-                    {showOwner && session.owner_email && <span className="ml-1.5 text-[9px] text-muted-foreground/70">{session.owner_email.split("@")[0]}</span>}
-                  </div>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <span className="truncate text-[10px] text-muted-foreground">{session.project}</span>
-                    <StatusBadge status={session.last_status} />
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {sessions.map((session) => {
+              const href = `/s/${session.id}`;
+              return (
+                <li key={session.id}>
+                  <Link
+                    href={href}
+                    onClick={() => { if (pathname !== href) setPending(href); }}
+                    className={cn(
+                      "animate-fade-up relative block rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary",
+                      (pending ?? pathname) === href && "bg-secondary"
+                    )}
+                  >
+                    <PendingDot />
+                    <div className="truncate text-xs text-foreground">
+                      {session.title || "Untitled request"}
+                      {showOwner && session.owner_email && <span className="ml-1.5 text-[9px] text-muted-foreground/70">{session.owner_email.split("@")[0]}</span>}
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="truncate text-[10px] text-muted-foreground">{session.project}</span>
+                      <StatusBadge status={session.last_status} />
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
     </aside>
+  );
+}
+
+function PendingDot() {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden
+      className={cn("absolute right-2 top-2 size-1.5 rounded-full bg-primary transition-opacity", pending ? "animate-pulse opacity-100" : "opacity-0")}
+    />
   );
 }
 
