@@ -30,7 +30,6 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         ownerEmail,
         viewerId: user.id,
         canWrite: canWriteProject(user, session.project),
-        canDecide: user.isAdmin || session.owner_id === user.id,
         models,
         defaultModel: defaultModel ?? models[0]?.id ?? "",
       }}

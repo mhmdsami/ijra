@@ -56,15 +56,6 @@ export async function startRun(input: {
   });
 }
 
-export async function mergeRun(input: { repo: string; prUrl: string }) {
-  const prNumber = input.prUrl.match(/\/pull\/(\d+)/)?.[1];
-  if (!prNumber) throw new Error("cannot parse PR number from URL");
-  await gh(`/repos/${input.repo}/pulls/${prNumber}/merge`, {
-    method: "PUT",
-    body: JSON.stringify({ merge_method: "squash" }),
-  });
-}
-
 export async function cancelRun(run: { ghRunId: number | null }) {
   if (run.ghRunId) {
     await gh(`/repos/${RUNNER_REPO}/actions/runs/${run.ghRunId}/cancel`, { method: "POST" });

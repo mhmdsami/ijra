@@ -17,7 +17,7 @@ import { projectConfig } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import type { MessageRow, RunRow, SessionRow, SessionRowWithStatus } from "@/db";
 
-type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; sessions: SessionRowWithStatus[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; canDecide: boolean; models: { id: string; label: string }[]; defaultModel: string };
+type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; sessions: SessionRowWithStatus[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; models: { id: string; label: string }[]; defaultModel: string };
 const ACTIVE = new Set(["dispatching", "running"]);
 
 export function SessionView({ initial }: { initial: State }) {
@@ -135,7 +135,7 @@ export function SessionView({ initial }: { initial: State }) {
             )}
             {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} />)}
             {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} />}
-            {!anyActive && <PrCard run={latestRun} canDecide={initial.canDecide} onMerged={(runs) => setState((s) => ({ ...s, runs }))} />}
+            {!anyActive && <PrCard run={latestRun} />}
             <div ref={bottomRef} />
           </div>
 
@@ -219,16 +219,7 @@ function StatusLine({ runs, onCancel }: { runs: RunRow[]; onCancel: () => void }
   );
 }
 
-function PrCard({
-  run,
-  canDecide,
-  onMerged,
-}: {
-  run: RunRow | undefined;
-  canDecide: boolean;
-  onMerged: (runs: RunRow[]) => void;
-}) {
-  const [merging, setMerging] = useState(false);
+function PrCard({ run }: { run: RunRow | undefined }) {
   if (!run || !run.pr_url) return null;
 
   const label =
@@ -241,15 +232,6 @@ function PrCard({
     : run.status === "merged" ? "text-[#71c98e]"
     : "text-muted-foreground";
 
-  const sessionId = run?.session_id ?? "";
-
-  async function merge() {
-    setMerging(true);
-    const res = await fetch(`/api/sessions/${sessionId}/merge`, { method: "POST" });
-    if (res.ok) onMerged(((await res.json()) as { runs: RunRow[] }).runs);
-    setMerging(false);
-  }
-
   let reasons: string[] = [];
   try { reasons = run.policy_reasons ? JSON.parse(run.policy_reasons) : []; } catch {}
 
@@ -261,13 +243,7 @@ function PrCard({
       </a>
       {run.branch && <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">{run.branch}</span>}
       <span className="ml-auto shrink-0">
-        {run.status === "awaiting_review" && canDecide ? (
-          <button onClick={merge} disabled={merging} className="rounded-full border border-foreground/25 px-3 py-1 text-[10px] uppercase tracking-wide transition-colors hover:bg-secondary disabled:opacity-40">
-            {merging ? "merging…" : "merge"}
-          </button>
-        ) : reasons.length > 0 ? (
-          <span className="text-[10px] text-muted-foreground">{reasons[0]}</span>
-        ) : null}
+        {reasons.length > 0 ? <span className="text-[10px] text-muted-foreground">{reasons[0]}</span> : null}
       </span>
     </div>
   );

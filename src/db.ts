@@ -355,26 +355,6 @@ export async function transitionRun(input: {
   return true;
 }
 
-export async function recordRunDecision(input: {
-  id: string;
-  decision: "approved" | "rejected";
-  actorId: string;
-  reason?: string;
-}) {
-  const run = await getRun(input.id);
-  if (!run || run.decision) return false;
-
-  const t = now();
-  const db = env().DB;
-  await db.batch([
-    db.prepare("UPDATE runs SET decision = ?, decided_by = ?, decided_at = ?, decision_reason = ?, updated_at = ? WHERE id = ? AND decision IS NULL")
-      .bind(input.decision, input.actorId, t, input.reason ?? null, t, input.id),
-    db.prepare("INSERT INTO audit_events (run_id, session_id, actor_id, action, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(input.id, run.session_id, input.actorId, `run.${input.decision}`, JSON.stringify({ reason: input.reason ?? null }), t),
-  ]);
-  return true;
-}
-
 export async function getRun(id: string) {
   return env().DB.prepare("SELECT * FROM runs WHERE id = ?").bind(id).first<RunRow>();
 }
