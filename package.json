@@ -9,7 +9,11 @@
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "db:local": "wrangler d1 migrations apply ijra --local",
     "db:remote": "wrangler d1 migrations apply ijra --remote",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "types": "tsc --noEmit",
+    "test": "node --test",
+    "smoke": "node scripts/smoke.mjs",
+    "gate": "npm run types && npm run test && npm run build && npm run smoke"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -33,6 +37,7 @@
     "@types/node": "^26",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "lefthook": "^2.1.14",
     "tailwindcss": "^4",
     "typescript": "^5.9",
     "wrangler": "^4"

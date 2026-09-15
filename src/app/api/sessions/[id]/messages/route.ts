@@ -16,15 +16,8 @@ import {
 } from "@/db";
 import { getDefaultModel, getModel } from "@/db";
 import { startRun } from "@/lib/runner";
+import { titleFrom } from "@/lib/title";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
-
-function titleFrom(request: string) {
-  const flat = request.replace(/\s+/g, " ").trim();
-  if (flat.length <= 60) return flat;
-  const cut = flat.slice(0, 60);
-  const lastSpace = cut.lastIndexOf(" ");
-  return `${cut.slice(0, lastSpace > 20 ? lastSpace : 60)}…`;
-}
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
