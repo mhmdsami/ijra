@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addMessage, appendAuditEvent, getRun, updateRun } from "@/db";
+import { addMessage, appendAuditEvent, getRun, setSessionTitle, updateRun } from "@/db";
 import { env } from "@/env";
 
 const maxAgeMs = 5 * 60_000;
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   if (!(await validSignature(body, req.headers.get("x-ijra-timestamp") ?? "", req.headers.get("x-ijra-signature") ?? ""))) {
     return NextResponse.json({ error: "invalid runner signature" }, { status: 401 });
   }
-  const payload = JSON.parse(body) as { runId?: string; status?: string; summary?: string; outcome?: { prUrl?: string; branch?: string; policyReasons?: string[] } };
+  const payload = JSON.parse(body) as { runId?: string; status?: string; summary?: string; outcome?: { prUrl?: string; branch?: string; policyReasons?: string[]; title?: string } };
   if (!payload.runId || !payload.status) return NextResponse.json({ error: "runId and status are required" }, { status: 400 });
   const fingerprint = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${req.headers.get("x-ijra-timestamp")}.${body}`)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   const replay = await env().DB.prepare("INSERT OR IGNORE INTO runner_callbacks (fingerprint, run_id, received_at) VALUES (?, ?, ?)").bind(fingerprint, payload.runId, Date.now()).run();
@@ -31,6 +31,8 @@ export async function POST(req: Request) {
   const summary = payload.summary?.trim();
   await updateRun(run.id, { status, pr_url: payload.outcome?.prUrl ?? null, branch: payload.outcome?.branch ?? null, agent_msg: summary ? 1 : 0, policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed", policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []) });
   if (summary) await addMessage(run.session_id, "agent", summary);
+  const title = payload.outcome?.title?.trim();
+  if (title) await setSessionTitle(run.session_id, title.slice(0, 80));
   await appendAuditEvent({ sessionId: run.session_id, runId: run.id, action: "runner.reported", metadata: { status, policyReasons: payload.outcome?.policyReasons ?? [] } });
   return NextResponse.json({ ok: true });
 }

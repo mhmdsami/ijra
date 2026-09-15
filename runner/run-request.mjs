@@ -186,6 +186,25 @@ if (MODE !== "fix" && MODE !== "ask" && MODE !== "auto") die(`Unknown mode "${MO
 const artifacts = resolve(here, "../artifacts");
 mkdirSync(artifacts, { recursive: true });
 
+async function generateTitle(piEnv) {
+  const prompt = [
+    "Write a title for the software request below.",
+    "Rules: at most 6 words, plain text, no quotes, no trailing punctuation, no explanation.",
+    "",
+    "Request:",
+    REQUEST.slice(0, 1500),
+  ].join("\n");
+  const promptPath = resolve(artifacts, "title-prompt.txt");
+  writeFileSync(promptPath, prompt);
+  const r = sh(`pi -p --provider opencode-go --model ${model} --no-session < ${shq(promptPath)}`, "title", { allowFail: true, env: piEnv });
+  if (r.status !== 0) return "";
+  return firstLine(r.stdout ?? "")
+    .replace(/^(title:\s*)/i, "")
+    .replace(/^[\s"'#*-]+|[\s"'*.]+$/g, "")
+    .slice(0, 80)
+    .trim();
+}
+
 async function report(status, summary) {
   if (!IJRA_WEBHOOK_URL || !IJRA_RUNNER_KEY) return;
   const body = JSON.stringify({ session, runId: RUN_ID || null, status, summary, outcome });
@@ -204,6 +223,7 @@ async function report(status, summary) {
 
 const outcome = {
   status: "failed",
+  title: null,
   project: PROJECT,
   repo: cfg.repo,
   session,
@@ -228,6 +248,9 @@ try {
   process.chdir(work);
   sh(cfg.install.join(" "), "install", { env: cleanEnv });
 
+  const generatedTitle = await generateTitle(piEnv).catch(() => "");
+  if (generatedTitle) outcome.title = generatedTitle;
+
   const prompt = buildPrompt(cfg, REQUEST, MODE);
   const requestPath = resolve(artifacts, "request.md");
   writeFileSync(requestPath, prompt);
@@ -245,7 +268,14 @@ try {
     "pi",
     { allowFail: true, env: piEnv }
   );
-  if (pi.status !== 0) die(`pi exited ${pi.status}. See artifacts/pi-response.txt`);
+  if (pi.status !== 0) {
+    let detail = "";
+    try {
+      detail = readFileSync(resolve(work, "../pi-response.txt"), "utf8").trim().slice(0, 500);
+    } catch {
+    }
+    die(`pi exited ${pi.status}${detail ? `: ${detail}` : ""}`);
+  }
   const agentSummary = readFileSync(resolve(work, "../pi-response.txt"), "utf8").trim().slice(0, 4000);
   outcome.agentSummary = agentSummary;
 
@@ -370,6 +400,8 @@ try {
 } catch (e) {
   if (e instanceof RunError) {
     console.error(`\nrunner: ${e.message}`);
+    outcome.status = "failed";
+    outcome.agentSummary = [outcome.agentSummary, `Run failed: ${e.message}`].filter(Boolean).join("\n\n");
     await finish(1);
   }
   throw e;
