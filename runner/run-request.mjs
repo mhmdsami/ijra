@@ -70,7 +70,13 @@ async function mintInstallationToken() {
   });
   const app = await api("/app", jwt);
   const botLogin = `${app.slug}[bot]`;
-  return { token: token.token, botId: app.id, botLogin };
+  let botId = app.id;
+  try {
+    const botUser = await api(`/users/${encodeURIComponent(botLogin)}`, token.token);
+    if (botUser?.id) botId = botUser.id;
+  } catch {
+  }
+  return { token: token.token, botId, botLogin };
 }
 
 function rmrf(p) {
