@@ -103,6 +103,7 @@ function PendingDot() {
 }
 
 function StatusBadge({ status }: { status: string | null }) {
-  const label = !status ? "new" : status === "dispatching" || status === "running" ? "running" : status;
-  return <Badge variant="outline" className="h-4 border-foreground/15 px-1 text-[9px] text-muted-foreground">{label}</Badge>;
+  const running = status === "dispatching" || status === "running";
+  const label = !status ? "new" : running ? "running" : status;
+  return <Badge variant="outline" className={cn("h-4 border-foreground/15 px-1 text-[9px] text-muted-foreground", running && "animate-pulse")}>{label}</Badge>;
 }
