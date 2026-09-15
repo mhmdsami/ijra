@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import type { SessionRowWithStatus } from "@/db";
+import { useSessions } from "@/components/sessions-context";
 import { cn } from "@/lib/utils";
 
 function label(status: string | null) {
@@ -14,7 +14,8 @@ function label(status: string | null) {
   return status.replaceAll("_", " ");
 }
 
-export function MobileThreads({ sessions }: { sessions: SessionRowWithStatus[] }) {
+export function MobileThreads() {
+  const { sessions } = useSessions();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 

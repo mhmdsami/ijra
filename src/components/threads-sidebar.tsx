@@ -5,10 +5,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import type { SessionRowWithStatus } from "@/db";
+import { useSessions } from "@/components/sessions-context";
 import { cn } from "@/lib/utils";
 
-export function ThreadsSidebar({ sessions, showOwner = false }: { sessions: SessionRowWithStatus[]; showOwner?: boolean }) {
+export function ThreadsSidebar() {
+  const { sessions, showOwner } = useSessions();
   const [open, setOpen] = useState(true);
   const pathname = usePathname();
 

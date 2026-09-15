@@ -1,6 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { auth } from "./auth-server";
 import { adminCount, getUserProjects, promoteToAdmin, type SessionRow } from "@/db";
 import { projects } from "./projects";
@@ -22,7 +23,7 @@ export interface CurrentUser {
   writeProjects: string[] | null;
 }
 
-export async function requireUser(): Promise<CurrentUser> {
+export const requireUser = cache(async (): Promise<CurrentUser> => {
   if (isLocalPreview()) {
     return { id: "dev-local", email: "dev@localhost", name: "Local", isAdmin: true, allowedProjects: null, writeProjects: null };
   }
@@ -42,7 +43,7 @@ export async function requireUser(): Promise<CurrentUser> {
     allowedProjects: grants?.map((g) => g.project) ?? null,
     writeProjects: grants?.filter((g) => g.canWrite).map((g) => g.project) ?? null,
   };
-}
+});
 
 async function projectGrants(userId: string) {
   const granted = await getUserProjects(userId);

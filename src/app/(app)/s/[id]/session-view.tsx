@@ -9,15 +9,14 @@ import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { HeaderActions } from "../../header-actions";
-import { ThreadsSidebar } from "@/components/threads-sidebar";
+import { HeaderActions } from "@/app/header-actions";
 import { MobileThreads } from "@/components/mobile-threads";
 import { ComposerControls } from "@/components/composer-controls";
 import { projectConfig } from "@/lib/projects";
 import { cn } from "@/lib/utils";
-import type { MessageRow, RunRow, SessionRow, SessionRowWithStatus } from "@/db";
+import type { MessageRow, RunRow, SessionRow } from "@/db";
 
-type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; sessions: SessionRowWithStatus[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; models: { id: string; label: string }[]; defaultModel: string };
+type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; models: { id: string; label: string }[]; defaultModel: string };
 const ACTIVE = new Set(["dispatching", "running"]);
 
 export function SessionView({ initial }: { initial: State }) {
@@ -97,70 +96,67 @@ export function SessionView({ initial }: { initial: State }) {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <ThreadsSidebar sessions={state.sessions} showOwner={state.session.owner_id !== state.viewerId || state.sessions.some((s) => s.owner_id !== state.viewerId)} />
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <MobileThreads sessions={state.sessions} />
-            <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href={`https://github.com/${projectConfig(state.session.project).repo}`}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-full border border-foreground/15 px-2.5 py-0.5 text-[10px] tracking-wide text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {state.session.project}
-            </Link>
-            {state.session.owner_id && state.session.owner_id !== state.viewerId && state.ownerEmail && (
-              <span className="text-[10px] text-muted-foreground" title="Session owner">{state.ownerEmail}</span>
-            )}
-            <Button onClick={deleteThread} variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete thread">
-              <Trash2 className="size-3.5" />
-            </Button>
-            <HeaderActions />
-          </div>
-        </header>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
+        <div className="flex items-center gap-2">
+          <MobileThreads />
+          <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`https://github.com/${projectConfig(state.session.project).repo}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-full border border-foreground/15 px-2.5 py-0.5 text-[10px] tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {state.session.project}
+          </Link>
+          {state.session.owner_id && state.session.owner_id !== state.viewerId && state.ownerEmail && (
+            <span className="text-[10px] text-muted-foreground" title="Session owner">{state.ownerEmail}</span>
+          )}
+          <Button onClick={deleteThread} variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete thread">
+            <Trash2 className="size-3.5" />
+          </Button>
+          <HeaderActions />
+        </div>
+      </header>
 
-        <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-6 sm:px-10">
-          <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto py-8 sm:py-12">
-            {state.messages.length === 0 && (
-              <div className="flex flex-1 flex-col justify-center">
-                <p className="text-[11px] uppercase tracking-[0.14em] text-primary">New request</p>
-                <h1 className="mt-3 text-2xl tracking-[-0.04em]">Describe the change.</h1>
-                <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">The agent will make the change and open a pull request.</p>
-              </div>
-            )}
-            {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} />)}
-            {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} />}
-            {!anyActive && <PrCard run={latestRun} />}
-            <div ref={bottomRef} />
-          </div>
-
-          <div className="shrink-0 pb-4 pt-2 sm:pb-5">
-            {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
-            <div className="flex items-end gap-3 rounded-xl border bg-card p-3 focus-within:border-primary/60">
-              <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-              }} placeholder="Ask a question or describe a change" rows={2} className="min-h-12 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent" />
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-6 sm:px-10">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto py-8 sm:py-12">
+          {state.messages.length === 0 && (
+            <div className="flex flex-1 flex-col justify-center">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-primary">New request</p>
+              <h1 className="mt-3 text-2xl tracking-[-0.04em]">Describe the change.</h1>
+              <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">The agent will make the change and open a pull request.</p>
             </div>
-            <p className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">
-              <span>Enter to send</span>
-              <Quota refreshKey={state.runs.length} />
-              <span className="ml-auto">
-                <ComposerControls
-                  model={model}
-                  models={state.models}
-                  onModel={setModel}
-                  onSend={send}
-                  busy={sending}
-                  disabled={!input.trim()}
-                />
-              </span>
-            </p>
+          )}
+          {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} />)}
+          {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} />}
+          {!anyActive && <PrCard run={latestRun} />}
+          <div ref={bottomRef} />
+        </div>
+
+        <div className="shrink-0 pb-4 pt-2 sm:pb-5">
+          {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
+          <div className="flex items-end gap-3 rounded-xl border bg-card p-3 focus-within:border-primary/60">
+            <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+            }} placeholder="Ask a question or describe a change" rows={2} className="min-h-12 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent" />
           </div>
+          <p className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">
+            <span>Enter to send</span>
+            <Quota refreshKey={state.runs.length} />
+            <span className="ml-auto">
+              <ComposerControls
+                model={model}
+                models={state.models}
+                onModel={setModel}
+                onSend={send}
+                busy={sending}
+                disabled={!input.trim()}
+              />
+            </span>
+          </p>
         </div>
       </div>
     </div>
