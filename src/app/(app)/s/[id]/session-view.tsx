@@ -29,6 +29,7 @@ export function SessionView({ initial }: { initial: State }) {
   const router = useRouter();
   const anyActive = state.runs.some((r) => ACTIVE.has(r.status));
   const activeRun = state.runs.find((r) => ACTIVE.has(r.status));
+  const dispatchAt = activeRun?.dispatch_at ?? 0;
   const latestRun = [...state.runs].reverse().find((r) => r.pr_url && !ACTIVE.has(r.status));
 
   const poll = useCallback(async () => {
@@ -41,9 +42,27 @@ export function SessionView({ initial }: { initial: State }) {
 
   useEffect(() => {
     if (!anyActive) return;
-    const t = setInterval(poll, 4000);
-    return () => clearInterval(t);
-  }, [anyActive, poll]);
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      const warm = Date.now() - dispatchAt < 15_000;
+      timer = setTimeout(tick, document.visibilityState === "visible" ? (warm ? 1500 : 5000) : 15_000);
+    };
+    const tick = async () => {
+      if (document.visibilityState === "visible") await poll();
+      schedule();
+    };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      tick();
+    };
+    schedule();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [anyActive, dispatchAt, poll]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [state.messages.length]);
 
