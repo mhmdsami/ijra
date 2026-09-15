@@ -48,7 +48,7 @@ export default async function Home() {
             <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
           </div>
           <div className="flex items-center gap-1">
-            {user.isAdmin && <Link href="/admin" className="rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">Users</Link>}
+            {user.isAdmin && <Link href="/admin" className="rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground">Admin</Link>}
             <HeaderActions />
           </div>
         </header>
