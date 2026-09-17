@@ -6,41 +6,26 @@ import { HeaderActions } from "../../header-actions";
 import { AdminNav } from "@/components/admin-nav";
 import { ModelCatalog, type CatalogItem } from "./model-catalog";
 
+import { modelCatalog } from "@/lib/model-catalog";
+
 export const dynamic = "force-dynamic";
-
-const CATALOG_URL = "https://models.dev/api.json";
-
-type CatalogModel = { id: string; name: string; vision: boolean };
-
-async function catalog(): Promise<CatalogModel[]> {
-  try {
-    const res = await fetch(CATALOG_URL, { next: { revalidate: 3600 } });
-    if (!res.ok) return [];
-    const data = (await res.json()) as Record<string, { models: Record<string, { name?: string; modalities?: { input?: string[] } }> }>;
-    const provider = data["opencode-go"]?.models ?? {};
-    return Object.entries(provider)
-      .map(([id, m]) => ({ id, name: m.name ?? id, vision: (m.modalities?.input ?? []).includes("image") }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  } catch {
-    return [];
-  }
-}
 
 export default async function ModelsPage() {
   await guardAdmin();
-  const [enabled, listing, usage] = await Promise.all([listModels(), catalog(), modelUsage()]);
+  const [enabled, catalog, usage] = await Promise.all([listModels(), modelCatalog().catch(() => null), modelUsage()]);
+  const listing = catalog ?? [];
   const enabledIds = new Set(enabled.map((m) => m.id));
   const defaultId = enabled.find((m) => m.is_default === 1)?.id ?? enabled[0]?.id ?? "";
 
   const enabledItems: CatalogItem[] = enabled
     .filter((m) => listing.some((c) => c.id === m.id))
-    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true }));
+    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true, unavailable: listing.find((c) => c.id === m.id)?.deprecated }));
   const missing: CatalogItem[] = enabled
     .filter((m) => !listing.some((c) => c.id === m.id))
-    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true, stale: true }));
+    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true, stale: catalog !== null, unavailable: true }));
   const available: CatalogItem[] = listing
     .filter((m) => !enabledIds.has(m.id))
-    .map((m) => ({ id: m.id, label: m.name, vision: m.vision, isDefault: false, enabled: false }));
+    .map((m) => ({ id: m.id, label: m.name, vision: m.vision, isDefault: false, enabled: false, unavailable: m.deprecated }));
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -63,7 +48,7 @@ export default async function ModelsPage() {
           </p>
         </div>
 
-        {listing.length === 0 && enabled.length === 0 && (
+        {catalog === null && (
           <p className="text-xs text-muted-foreground">Could not reach the model catalog. Try again shortly.</p>
         )}
 

@@ -18,7 +18,7 @@ export function ModelRow({
   usage,
   stale = false,
 }: {
-  model: { id: string; label: string; vision: boolean; isDefault: boolean; enabled: boolean };
+  model: { id: string; label: string; vision: boolean; isDefault: boolean; enabled: boolean; unavailable?: boolean };
   usage?: { runs: number; users: number; last: number | null };
   stale?: boolean;
 }) {
@@ -38,7 +38,7 @@ export function ModelRow({
           {model.id}
           {model.vision && " · images"}
           {model.isDefault && " · default"}
-          {stale && " · not in catalog"}
+          {stale ? " · not in catalog" : model.unavailable && " · unavailable"}
           {" · "}
           {usage ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last)}` : lastUsed(null)}
         </div>
@@ -48,7 +48,7 @@ export function ModelRow({
           <>
             <button
               type="button"
-              disabled={model.isDefault}
+              disabled={model.isDefault || model.unavailable || stale || pending}
               onClick={() => run(setDefaultModelAction, { id: model.id })}
               className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
             >
@@ -65,10 +65,11 @@ export function ModelRow({
         ) : (
           <button
             type="button"
-            onClick={() => run(addModelAction, { id: model.id, label: model.label, vision: model.vision ? "1" : "" })}
-            className="rounded-full bg-foreground px-3 py-1 text-[10px] uppercase tracking-wide text-background"
+            disabled={model.unavailable || stale || pending}
+            onClick={() => run(addModelAction, { id: model.id })}
+            className="rounded-full bg-foreground px-3 py-1 text-[10px] uppercase tracking-wide text-background disabled:cursor-not-allowed disabled:opacity-40"
           >
-            enable
+            {model.unavailable || stale ? "unavailable" : "enable"}
           </button>
         )}
       </div>

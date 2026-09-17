@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ModelRow } from "./model-row";
 import type { ModelUsage } from "@/db";
 
-export type CatalogItem = { id: string; label: string; vision: boolean; isDefault: boolean; enabled: boolean; stale?: boolean };
+export type CatalogItem = { id: string; label: string; vision: boolean; isDefault: boolean; enabled: boolean; unavailable?: boolean; stale?: boolean };
 
 export function ModelCatalog({
   enabled,
@@ -60,9 +60,15 @@ function Sections({
       {hasQuery && empty && <p className="text-xs text-muted-foreground">No models match.</p>}
       <h2 className="mt-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Enabled</h2>
       {shown.enabled.map((m) => <ModelRow key={m.id} model={m} usage={usage[m.id]} />)}
-      {shown.missing.map((m) => <ModelRow key={m.id} model={m} usage={usage[m.id]} stale />)}
+      {shown.missing.map((m) => <ModelRow key={m.id} model={m} usage={usage[m.id]} stale={m.stale} />)}
       <h2 className="mt-4 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Available</h2>
-      {shown.available.map((m) => <ModelRow key={m.id} model={m} usage={usage[m.id]} />)}
+      {shown.available.filter((m) => !m.unavailable).map((m) => <ModelRow key={m.id} model={m} usage={usage[m.id]} />)}
+      {shown.available.some((m) => m.unavailable) && (
+        <>
+          <h2 className="mt-4 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Unavailable</h2>
+          {shown.available.filter((m) => m.unavailable).map((m) => <ModelRow key={m.id} model={m} usage={usage[m.id]} />)}
+        </>
+      )}
     </>
   );
 }

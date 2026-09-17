@@ -21,6 +21,7 @@ import {
 } from "@/db";
 import { requireUser } from "@/lib/user";
 import { projects } from "@/lib/projects";
+import { availableModel } from "@/lib/model-catalog";
 
 export async function saveAccessAction(formData: FormData) {
   const admin = await requireUser();
@@ -88,9 +89,9 @@ export async function addModelAction(formData: FormData) {
   const admin = await requireUser();
   if (!admin.isAdmin) return;
   const id = String(formData.get("id") ?? "").trim();
-  const label = String(formData.get("label") ?? "").trim() || id;
   if (!id) return;
-  await addModelRow(id, label, formData.get("vision") === "1");
+  const model = await availableModel(id);
+  await addModelRow(model.id, model.name, model.vision);
   revalidatePath("/admin/models");
   revalidatePath("/");
 }
@@ -110,6 +111,7 @@ export async function setDefaultModelAction(formData: FormData) {
   if (!admin.isAdmin) return;
   const id = String(formData.get("id") ?? "").trim();
   if (!id) return;
+  await availableModel(id);
   await setDefaultModelRow(id);
   revalidatePath("/admin/models");
   revalidatePath("/");
