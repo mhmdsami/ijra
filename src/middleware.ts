@@ -1,14 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getSessionCookie } from "better-auth/cookies";
-
-function isLocalPreview() {
-  try {
-    return !!(getCloudflareContext().env as Record<string, string>).BETTER_AUTH_URL?.startsWith("http://localhost");
-  } catch {
-    return false;
-  }
-}
+import { isLocalPreview } from "@/lib/local-preview";
 
 export function middleware(req: NextRequest) {
   if (isLocalPreview()) return NextResponse.next();

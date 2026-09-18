@@ -1,18 +1,10 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { auth } from "./auth-server";
 import { adminCount, getUserProjects, promoteToAdmin, type SessionRow } from "@/db";
 import { projects } from "./projects";
-
-function isLocalPreview() {
-  try {
-    return !!(getCloudflareContext().env as Record<string, string>).BETTER_AUTH_URL?.startsWith("http://localhost");
-  } catch {
-    return false;
-  }
-}
+import { isLocalPreview } from "./local-preview";
 
 export interface CurrentUser {
   id: string;
