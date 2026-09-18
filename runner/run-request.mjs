@@ -150,7 +150,6 @@ async function downloadImages(dir) {
   return paths;
 }
 
-const progressUrl = IJRA_PROGRESS_URL || (IJRA_WEBHOOK_URL ? IJRA_WEBHOOK_URL.replace(/\/answer$/, "/progress") : "");
 let progressSeq = 0;
 let progressQueue = [];
 let progressTimer = null;
@@ -178,6 +177,7 @@ async function flushProgress() {
   }
   const events = progressQueue;
   progressQueue = [];
+  const progressUrl = IJRA_PROGRESS_URL || (IJRA_WEBHOOK_URL ? IJRA_WEBHOOK_URL.replace(/\/answer$/, "/progress") : "");
   if (events.length === 0 || !progressUrl || !IJRA_RUNNER_KEY) return;
   const body = JSON.stringify({ runId: RUN_ID || null, events });
   const timestamp = String(Date.now());
