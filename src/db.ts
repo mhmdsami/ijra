@@ -54,8 +54,16 @@ export interface ModelRow {
 async function readModels(): Promise<ModelRow[]> {
   const row = await env().DB.prepare("SELECT value FROM settings WHERE key = 'models'").first<{ value: string }>();
   if (!row) return [];
-  const parsed = JSON.parse(row.value) as { id: string; label: string; vision?: boolean; default?: boolean }[];
-  return parsed.map((m) => ({ id: m.id, label: m.label, vision: m.vision ? 1 : 0, is_default: m.default ? 1 : 0 }));
+  let parsed: { id?: string; label?: string; vision?: boolean; default?: boolean }[];
+  try {
+    parsed = JSON.parse(row.value);
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed
+    .filter((m) => typeof m?.id === "string")
+    .map((m) => ({ id: m.id as string, label: typeof m.label === "string" ? m.label : (m.id as string), vision: m.vision ? 1 : 0, is_default: m.default ? 1 : 0 }));
 }
 
 async function writeModels(models: ModelRow[]) {
@@ -147,7 +155,15 @@ export async function getSuperAdminId() {
 }
 
 export async function deleteUserRow(id: string) {
-  await env().DB.prepare("DELETE FROM user WHERE id = ?").bind(id).run();
+  const db = env().DB;
+  await db.batch([
+    db.prepare("DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
+    db.prepare("DELETE FROM runs WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
+    db.prepare("DELETE FROM sessions WHERE owner_id = ?").bind(id),
+    db.prepare("DELETE FROM user_projects WHERE userId = ?").bind(id),
+    db.prepare("DELETE FROM user_limits WHERE user_id = ?").bind(id),
+    db.prepare("DELETE FROM user WHERE id = ?").bind(id),
+  ]);
 }
 
 export async function setUserProject(userId: string, project: string, canWrite: boolean) {
@@ -291,19 +307,21 @@ export async function createRun(
   model: string,
   requestedBy: string,
   requestWindowStart: number,
+  dailyLimit: number | null,
   mode: "fix" | "ask" | "auto" = "auto"
 ) {
   const id = crypto.randomUUID();
   const t = now();
+  const limitClause = dailyLimit === null ? "" : " AND (SELECT COUNT(*) FROM runs WHERE requested_by = ? AND dispatch_at >= ?) < ?";
+  const limitBinds = dailyLimit === null ? [] : [requestedBy, requestWindowStart, dailyLimit];
   const result = await env().DB.prepare(
     `INSERT INTO runs (id, session_id, project, request, model, requested_by, mode, status, dispatch_at, updated_at)
      SELECT ?, ?, ?, ?, ?, ?, ?, 'dispatching', ?, ?
      WHERE NOT EXISTS (
        SELECT 1 FROM runs WHERE project = ? AND status IN (${activeRunStatuses.map(() => "?").join(", ")})
-     )
-     AND (SELECT COUNT(*) FROM runs WHERE requested_by = ? AND dispatch_at >= ?) < 5`
+     )${limitClause}`
   )
-    .bind(id, sessionId, project, request, model, requestedBy, mode, t, t, project, ...activeRunStatuses, requestedBy, requestWindowStart)
+    .bind(id, sessionId, project, request, model, requestedBy, mode, t, t, project, ...activeRunStatuses, ...limitBinds)
     .run();
   return result.meta.changes === 1 ? id : null;
 }
