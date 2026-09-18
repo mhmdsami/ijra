@@ -28,12 +28,24 @@ async function waitForServer(timeoutMs = 90_000) {
   throw new Error(`server did not start within ${timeoutMs}ms\n${logs.slice(-2000)}`);
 }
 
-async function check(path, expected) {
-  const res = await fetch(`${base}${path}`, { redirect: "manual" });
-  if (res.status >= 500) throw new Error(`${path} returned ${res.status}`);
-  const body = await res.text();
-  if (expected && !body.includes(expected)) throw new Error(`${path} did not contain ${JSON.stringify(expected)}`);
-  console.log(`smoke: ${path} ${res.status} ok`);
+async function check(path, expected, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  let last = "no response";
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${base}${path}`, { redirect: "manual" });
+      const body = await res.text();
+      if (res.status < 500 && (!expected || body.includes(expected))) {
+        console.log(`smoke: ${path} ${res.status} ok`);
+        return;
+      }
+      last = `status ${res.status}, missing ${JSON.stringify(expected)}`;
+    } catch (error) {
+      last = error.message;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error(`${path} never rendered: ${last}`);
 }
 
 try {

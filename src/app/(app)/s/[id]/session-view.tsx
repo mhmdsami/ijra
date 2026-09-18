@@ -30,7 +30,7 @@ export function SessionView({ initial }: { initial: State }) {
   const anyActive = state.runs.some((r) => ACTIVE.has(r.status));
   const activeRun = state.runs.find((r) => ACTIVE.has(r.status));
   const dispatchAt = activeRun?.dispatch_at ?? 0;
-  const latestRun = [...state.runs].reverse().find((r) => r.pr_url && !ACTIVE.has(r.status));
+  const latestRun = [...state.runs].reverse().find((r) => !ACTIVE.has(r.status) && (r.pr_url || r.status === "blocked"));
 
   const poll = useCallback(async () => {
     const res = await fetch(`/api/sessions/${initial.session.id}`, { cache: "no-store" });
@@ -235,11 +235,12 @@ function StatusLine({ runs, onCancel }: { runs: RunRow[]; onCancel: () => void }
 }
 
 function PrCard({ run }: { run: RunRow | undefined }) {
-  if (!run || !run.pr_url) return null;
+  if (!run || (!run.pr_url && run.status !== "blocked")) return null;
 
   const label =
     run.status === "awaiting_review" ? "Awaiting review"
     : run.status === "merged" ? "Merged"
+    : run.status === "blocked" ? "Blocked"
     : run.status === "failed" ? "Failed"
     : run.status;
   const tone =
@@ -253,9 +254,11 @@ function PrCard({ run }: { run: RunRow | undefined }) {
   return (
     <div className="animate-fade-up flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
       <Badge variant="outline" className={cn("shrink-0 border-foreground/15 text-[10px] uppercase tracking-wide", tone)}>{label}</Badge>
-      <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
-        {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
-      </a>
+      {run.pr_url && (
+        <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
+          {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
+        </a>
+      )}
       {run.branch && <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">{run.branch}</span>}
       <span className="ml-auto shrink-0">
         {reasons.length > 0 ? <span className="text-[10px] text-muted-foreground">{reasons[0]}</span> : null}

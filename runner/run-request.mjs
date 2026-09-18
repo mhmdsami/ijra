@@ -309,7 +309,11 @@ try {
   if (changed.length > 12) outcome.policyReasons.push(`changed ${changed.length} files; limit is 12`);
   if (outcome.changedLines > 400) outcome.policyReasons.push(`changed ${outcome.changedLines} lines; limit is 400`);
   if (disallowed.length) outcome.policyReasons.push(`review required: ${disallowed.join(", ")}`);
-  if (outcome.policyReasons.length) die(`Policy blocked PR creation: ${outcome.policyReasons.join("; ")}`);
+  if (outcome.policyReasons.length) {
+    outcome.status = "blocked";
+    outcome.agentSummary = [outcome.agentSummary, `Blocked by policy: ${outcome.policyReasons.join("; ")}`].filter(Boolean).join("\n\n");
+    await finish(0);
+  }
 
   for (const step of cfg.verify ?? []) {
     const r = sh(step.cmd.join(" "), `verify:${step.name}`, { allowFail: true, env: cleanEnv });

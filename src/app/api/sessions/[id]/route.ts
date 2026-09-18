@@ -12,7 +12,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!session || !canAccessSession(user, session)) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const runs = await getRuns(id);
-  const terminal = new Set(["done", "merged", "failed", "cancelled", "answered", "no_changes", "awaiting_review"]);
+  const terminal = new Set(["done", "merged", "failed", "cancelled", "answered", "no_changes", "awaiting_review", "blocked"]);
   let agentMessage: string | null = null;
 
   for (const run of runs) {
