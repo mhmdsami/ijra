@@ -1,5 +1,5 @@
 import { env, now } from "./env";
-import type { SessionImage } from "./lib/types";
+import type { ProgressEvent, ProgressKind, ProgressRow, SessionImage } from "./lib/types";
 
 export const DEFAULT_DAILY_LIMIT = 5;
 
@@ -161,6 +161,7 @@ export async function deleteUserRow(id: string) {
     db.prepare("DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
     db.prepare("DELETE FROM runs WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
     db.prepare("DELETE FROM images WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
+    db.prepare("DELETE FROM run_progress WHERE run_id IN (SELECT id FROM runs WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?))").bind(id),
     db.prepare("DELETE FROM sessions WHERE owner_id = ?").bind(id),
     db.prepare("DELETE FROM user_projects WHERE userId = ?").bind(id),
     db.prepare("DELETE FROM user_limits WHERE user_id = ?").bind(id),
@@ -370,6 +371,29 @@ export async function countSessionImages(sessionId: string, ids: string[]) {
 export async function setImagesRun(ids: string[], runId: string) {
   if (ids.length === 0) return;
   await env().DB.prepare(`UPDATE images SET run_id = ? WHERE id IN (${ids.map(() => "?").join(", ")})`).bind(runId, ...ids).run();
+}
+
+export async function appendProgress(runId: string, events: ProgressEvent[]) {
+  if (events.length === 0) return;
+  const db = env().DB;
+  const t = now();
+  await db.batch(
+    events.map((event) => db
+      .prepare("INSERT OR IGNORE INTO run_progress (run_id, seq, kind, text, created_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(runId, event.seq, event.kind, event.text, t))
+  );
+}
+
+export async function listProgress(runId: string, afterId = 0, limit = 300) {
+  const { results } = await env()
+    .DB.prepare("SELECT * FROM run_progress WHERE run_id = ? AND id > ? ORDER BY id LIMIT ?")
+    .bind(runId, afterId, limit)
+    .all<ProgressRow>();
+  return results ?? [];
+}
+
+export async function clearProgress(runId: string) {
+  await env().DB.prepare("DELETE FROM run_progress WHERE run_id = ?").bind(runId).run();
 }
 
 export async function deleteSession(sessionId: string) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHmac, createSign } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -150,7 +150,103 @@ async function downloadImages(dir) {
   return paths;
 }
 
+const progressUrl = IJRA_PROGRESS_URL || (IJRA_WEBHOOK_URL ? IJRA_WEBHOOK_URL.replace(/\/answer$/, "/progress") : "");
+let progressSeq = 0;
+let progressQueue = [];
+let progressTimer = null;
+let pendingText = "";
+
+function emitProgress(kind, text) {
+  const clean = String(text ?? "").trim();
+  if (!clean) return;
+  progressQueue.push({ seq: (progressSeq += 1), kind, text: clean.slice(0, 2000) });
+  if (progressQueue.length >= 40) {
+    flushProgress();
+    return;
+  }
+  if (!progressTimer) progressTimer = setTimeout(() => flushProgress(), 1200);
+}
+
+async function flushProgress() {
+  if (progressTimer) {
+    clearTimeout(progressTimer);
+    progressTimer = null;
+  }
+  if (pendingText.trim()) {
+    progressQueue.unshift({ seq: (progressSeq += 1), kind: "text", text: pendingText.trim().slice(0, 2000) });
+    pendingText = "";
+  }
+  const events = progressQueue;
+  progressQueue = [];
+  if (events.length === 0 || !progressUrl || !IJRA_RUNNER_KEY) return;
+  const body = JSON.stringify({ runId: RUN_ID || null, events });
+  const timestamp = String(Date.now());
+  const signature = createHmac("sha256", IJRA_RUNNER_KEY).update(`${timestamp}.${body}`).digest("hex");
+  try {
+    await fetch(progressUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-ijra-timestamp": timestamp, "x-ijra-signature": signature },
+      body,
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+  }
+}
+
+function runPi(cmd, options) {
+  return new Promise((resolve) => {
+    const child = spawn(cmd, { shell: true, env: options.env, stdio: ["ignore", "pipe", "pipe"] });
+    let buffer = "";
+    let streamed = "";
+    let finalMessage = "";
+    let stderr = "";
+    let toolCalls = 0;
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      buffer += chunk;
+      let index;
+      while ((index = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, index).trim();
+        buffer = buffer.slice(index + 1);
+        if (!line) continue;
+        let event;
+        try {
+          event = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        const delta = event?.type === "message_update" ? event.assistantMessageEvent : null;
+        if (delta?.type === "text_delta" && typeof delta.delta === "string") {
+          streamed += delta.delta;
+          pendingText += delta.delta;
+          continue;
+        }
+        if (event?.type === "message_end" && event.message?.role === "assistant") {
+          const text = (event.message.content ?? [])
+            .filter((part) => part?.type === "text")
+            .map((part) => part.text)
+            .join("");
+          if (text.trim()) finalMessage = text;
+          continue;
+        }
+        if (event?.type === "tool_execution_start") {
+          toolCalls += 1;
+          const args = event.args ?? {};
+          const detail = args.command || args.path || args.pattern || args.query || "";
+          emitProgress("tool", `${event.toolName || "tool"}${detail ? `: ${String(detail).slice(0, 120)}` : ""}`);
+        }
+      }
+    });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("close", (code) => resolve({ code: code ?? 1, text: (finalMessage || streamed).trim(), stderr, toolCalls }));
+  });
+}
+
 async function finish(code) {
+  await flushProgress();
   await report(outcome.status, outcome.agentSummary.slice(0, 4000));
   writeFileSync(resolve(artifacts, "outcome.json"), JSON.stringify(outcome, null, 2));
   if (GITHUB_OUTPUT) {
@@ -202,6 +298,7 @@ const {
   GITHUB_OUTPUT = "",
   GITHUB_STEP_SUMMARY = "",
   IJRA_WEBHOOK_URL = "",
+  IJRA_PROGRESS_URL = "",
   IJRA_RUNNER_KEY = "",
 } = process.env;
 
@@ -269,6 +366,7 @@ const outcome = {
   policyReasons: [],
   changedLines: 0,
   agentSummary: "",
+  toolCalls: 0,
   verify: {},
 };
 
@@ -278,12 +376,17 @@ try {
   const { token: GH_TOKEN, botId, botLogin } = await mintInstallationToken();
   const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !["APP_ID", "APP_PRIVATE_KEY", "IJRA_RUNNER_KEY", "GH_TOKEN", "OPENCODE_API_KEY"].includes(key)));
   const piEnv = { ...cleanEnv, OPENCODE_API_KEY: process.env.OPENCODE_API_KEY };
+  emitProgress("stage", `cloning ${cfg.repo}`);
   sh(`git clone --depth 50 https://x-access-token:${GH_TOKEN}@github.com/${cfg.repo}.git ${work}`, "clone", { env: cleanEnv });
   process.chdir(work);
+  emitProgress("stage", "installing dependencies");
   sh(cfg.install.join(" "), "install", { env: cleanEnv });
 
   const generatedTitle = await generateTitle(piEnv).catch(() => "");
-  if (generatedTitle) outcome.title = generatedTitle;
+  if (generatedTitle) {
+    outcome.title = generatedTitle;
+    emitProgress("stage", `titled: ${generatedTitle}`);
+  }
 
   const imagePaths = await downloadImages(resolve(artifacts, "images"));
   const prompt = buildPrompt(cfg, REQUEST, MODE) + (imagePaths.length
@@ -300,22 +403,20 @@ try {
   const sessionDir = resolve(here, "../pi-session");
   if (SESSION) mkdirSync(sessionDir, { recursive: true });
   const sessionArgs = SESSION ? `--session-id ${shq(SESSION)} --session-dir ${shq(sessionDir)}` : "";
-  const pi = sh(
-    `pi -p --provider opencode-go --model ${model} ${skillArgs} ${sessionArgs} < ${shq(requestPath)} > ../pi-response.txt`,
-    "pi",
-    { allowFail: true, env: piEnv }
+  emitProgress("stage", `agent started on ${model}`);
+  const pi = await runPi(
+    `pi -p --mode json --provider opencode-go --model ${model} ${skillArgs} ${sessionArgs} < ${shq(requestPath)}`,
+    { env: piEnv }
   );
-  if (pi.status !== 0) {
-    let detail = "";
-    try {
-      detail = readFileSync(resolve(work, "../pi-response.txt"), "utf8").trim().slice(0, 500);
-    } catch {
-    }
-    die(`pi exited ${pi.status}${detail ? `: ${detail}` : ""}`);
+  if (pi.code !== 0) {
+    const detail = pi.text || pi.stderr.trim();
+    die(`pi exited ${pi.code}${detail ? `: ${detail.slice(0, 500)}` : ""}`);
   }
-  const agentSummary = readFileSync(resolve(work, "../pi-response.txt"), "utf8").trim().slice(0, 4000);
+  const agentSummary = pi.text.slice(0, 4000);
   outcome.agentSummary = agentSummary;
+  outcome.toolCalls = pi.toolCalls;
 
+  emitProgress("stage", "agent finished");
   if (MODE === "ask") {
     sh("git checkout -- . && git clean -fd", "discard changes", { allowFail: true, env: cleanEnv });
     outcome.status = "answered";
@@ -349,6 +450,7 @@ try {
   }
 
   for (const step of cfg.verify ?? []) {
+    emitProgress("stage", `verifying: ${step.name}`);
     const r = sh(step.cmd.join(" "), `verify:${step.name}`, { allowFail: true, env: cleanEnv });
     outcome.verify[step.name] = r.status === 0 ? "pass" : "fail";
     if (r.status !== 0) {
@@ -357,6 +459,7 @@ try {
     }
   }
 
+  emitProgress("stage", `committing ${changed.length} file(s)`);
   outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
 
   const generated = ["tsconfig.json", "next-env.d.ts", "tsconfig.tsbuildinfo"];
@@ -365,9 +468,11 @@ try {
     sh(`git checkout -- ${drifted.join(" ")}`, { allowFail: true });
     changed = changed.filter((f) => !drifted.includes(f));
     outcome.changedFiles = changed;
-    outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
+    emitProgress("stage", `committing ${changed.length} file(s)`);
+  outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
   } else {
-    outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
+    emitProgress("stage", `committing ${changed.length} file(s)`);
+  outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
   }
 
   const titleMatch = agentSummary.match(/^Title:\s*(.+)$/m);
@@ -439,6 +544,7 @@ try {
   outcome.prUrl = prUrl;
 
   outcome.status = "awaiting_review";
+  emitProgress("stage", `pull request opened: ${prUrl}`);
   await finish(0);
 } catch (e) {
   if (e instanceof RunError) {

@@ -76,6 +76,7 @@ jobs:
           APP_ID: ${{ secrets.APP_ID }}
           APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          IJRA_PROGRESS_URL: https://your-dashboard.example/api/internal/progress
           IJRA_WEBHOOK_URL: https://your-dashboard.example.com/api/internal/answer
           IJRA_RUNNER_KEY: ${{ secrets.IJRA_RUNNER_KEY }}
         run: node runner/run-request.mjs

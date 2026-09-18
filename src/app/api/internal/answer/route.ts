@@ -1,17 +1,7 @@
 import { NextResponse } from "next/server";
-import { addMessage, appendAuditEvent, getRun, setSessionTitle, updateRun } from "@/db";
+import { addMessage, appendAuditEvent, clearProgress, getRun, setSessionTitle, updateRun } from "@/db";
+import { validSignature } from "@/lib/webhook";
 import { env } from "@/env";
-
-const maxAgeMs = 5 * 60_000;
-
-async function validSignature(body: string, timestamp: string, signature: string) {
-  if (!/^\d+$/.test(timestamp) || Math.abs(Date.now() - Number(timestamp)) > maxAgeMs) return false;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(env().IJRA_RUNNER_KEY), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const bytes = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${timestamp}.${body}`));
-  const expected = [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  if (signature.length !== expected.length) return false;
-  return [...signature].reduce((diff, char, index) => diff | (char.charCodeAt(0) ^ expected.charCodeAt(index)), 0) === 0;
-}
 
 function parseJson(body: string) {
   try {
@@ -40,6 +30,7 @@ export async function POST(req: Request) {
   const summary = payload.summary?.trim();
   await updateRun(run.id, { status, pr_url: payload.outcome?.prUrl ?? null, branch: payload.outcome?.branch ?? null, agent_msg: summary ? 1 : 0, policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed", policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []) });
   if (summary) await addMessage(run.session_id, "agent", summary);
+  await clearProgress(run.id);
   const title = payload.outcome?.title?.trim();
   if (title) await setSessionTitle(run.session_id, title.slice(0, 80));
   await appendAuditEvent({ sessionId: run.session_id, runId: run.id, action: "runner.reported", metadata: { status, policyReasons: payload.outcome?.policyReasons ?? [] } });

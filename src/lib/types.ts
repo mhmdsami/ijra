@@ -24,3 +24,21 @@ export type SessionImage = {
   height: number | null;
   created_at: number;
 };
+
+export type ProgressKind = "stage" | "text" | "tool";
+
+export type ProgressEvent = {
+  seq: number;
+  kind: ProgressKind;
+  text: string;
+};
+
+export type ProgressRow = ProgressEvent & {
+  id: number;
+  run_id: string;
+  created_at: number;
+};
+
+export type StreamEvent =
+  | { type: "stage" | "text" | "tool"; text: string }
+  | { type: "done" | "reconnect" };

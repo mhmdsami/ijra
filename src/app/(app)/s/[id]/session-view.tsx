@@ -16,6 +16,7 @@ import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/com
 import { projectConfig } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
+import type { StreamEvent } from "@/lib/types";
 
 type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; models: { id: string; label: string; vision: boolean }[]; defaultModel: string };
 const ACTIVE = new Set(["dispatching", "running"]);
@@ -28,6 +29,7 @@ export function SessionView({ initial }: { initial: State }) {
   const imageQueue = useImageQueue();
   const modelSupportsImages = state.models.find((m) => m.id === model)?.vision ?? false;
   const [sendError, setSendError] = useState<string | null>(null);
+  const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({ text: "", tools: [], stage: "" });
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const anyActive = state.runs.some((r) => ACTIVE.has(r.status));
@@ -42,6 +44,31 @@ export function SessionView({ initial }: { initial: State }) {
       setState((state) => ({ ...state, ...data }));
     }
   }, [initial.session.id]);
+
+  useEffect(() => {
+    if (!anyActive) {
+      setLive({ text: "", tools: [], stage: "" });
+      return;
+    }
+    const source = new EventSource(`/api/sessions/${initial.session.id}/stream`);
+    source.onmessage = (message) => {
+      let event: StreamEvent;
+      try {
+        event = JSON.parse(message.data) as StreamEvent;
+      } catch {
+        return;
+      }
+      if (event.type === "text") setLive((current) => ({ ...current, text: (current.text + event.text).slice(-4000) }));
+      else if (event.type === "tool") setLive((current) => ({ ...current, tools: [...current.tools, event.text].slice(-6) }));
+      else if (event.type === "stage") setLive((current) => ({ ...current, stage: event.text }));
+      else if (event.type === "done") {
+        source.close();
+        poll();
+      }
+    };
+    source.onerror = () => source.close();
+    return () => source.close();
+  }, [anyActive, initial.session.id, poll]);
 
   useEffect(() => {
     if (!anyActive) return;
@@ -158,7 +185,19 @@ export function SessionView({ initial }: { initial: State }) {
             </div>
           )}
           {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} meta={m.meta} />)}
-          {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} />}
+          {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />}
+          {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
+            <div className="animate-fade-up flex flex-col gap-2 rounded-xl border bg-card/60 p-3">
+              {live.tools.length > 0 && (
+                <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+                  {live.tools.map((tool, index) => <span key={`${index}-${tool}`} className="truncate">› {tool}</span>)}
+                </div>
+              )}
+              {live.text.length > 0 && (
+                <p className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{live.text}</p>
+              )}
+            </div>
+          )}
           {!anyActive && <PrCard run={latestRun} />}
           <div ref={bottomRef} />
         </div>
@@ -247,10 +286,11 @@ function Markdown({ text }: { text: string }) {
   );
 }
 
-function StatusLine({ runs, onCancel }: { runs: RunRow[]; onCancel: () => void }) {
+function StatusLine({ runs, onCancel, stage }: { runs: RunRow[]; onCancel: () => void; stage?: string }) {
   const latest = runs.at(-1);
   if (!latest) return null;
-  const label = latest.status === "dispatching" ? "Dispatching request" : latest.status === "running" ? "Agent is working" : null;
+  const base = latest.status === "dispatching" ? "Dispatching request" : latest.status === "running" ? "Agent is working" : null;
+  const label = stage ? `${base}: ${stage}` : base;
   if (!label) return null;
   return (
     <div className="animate-fade-up flex items-center gap-2 text-xs text-primary">
