@@ -154,6 +154,7 @@ let progressSeq = 0;
 let progressQueue = [];
 let progressTimer = null;
 let pendingText = "";
+let progressConfigWarned = false;
 
 function emitProgress(kind, text) {
   const clean = String(text ?? "").trim();
@@ -178,18 +179,27 @@ async function flushProgress() {
   const events = progressQueue;
   progressQueue = [];
   const progressUrl = IJRA_PROGRESS_URL || (IJRA_WEBHOOK_URL ? IJRA_WEBHOOK_URL.replace(/\/answer$/, "/progress") : "");
-  if (events.length === 0 || !progressUrl || !IJRA_RUNNER_KEY) return;
+  if (!progressUrl || !IJRA_RUNNER_KEY) {
+    if (!progressConfigWarned) {
+      progressConfigWarned = true;
+      console.error(`runner: progress disabled (url=${progressUrl ? "set" : "missing"}, key=${IJRA_RUNNER_KEY ? "set" : "missing"})`);
+    }
+    return;
+  }
+  if (events.length === 0) return;
   const body = JSON.stringify({ runId: RUN_ID || null, events });
   const timestamp = String(Date.now());
   const signature = createHmac("sha256", IJRA_RUNNER_KEY).update(`${timestamp}.${body}`).digest("hex");
   try {
-    await fetch(progressUrl, {
+    const res = await fetch(progressUrl, {
       method: "POST",
       headers: { "content-type": "application/json", "x-ijra-timestamp": timestamp, "x-ijra-signature": signature },
       body,
       signal: AbortSignal.timeout(5000),
     });
-  } catch {
+    if (!res.ok) console.error(`runner: progress report failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  } catch (error) {
+    console.error(`runner: progress report error: ${error?.message ?? error}`);
   }
 }
 
