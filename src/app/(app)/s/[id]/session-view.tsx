@@ -202,7 +202,7 @@ function Message({ role, content }: { role: string; content: string }) {
     <article className="animate-fade-up border-l border-border pl-4">
       <p className={cn("mb-2 text-[10px] uppercase tracking-[0.14em]", isUser ? "text-primary" : "text-muted-foreground")}>{isUser ? "You" : "ijra"}</p>
       {isUser ? (
-        <div className="max-w-3xl whitespace-pre-wrap text-sm leading-6">{content}</div>
+        <div className="max-w-3xl break-words whitespace-pre-wrap text-sm leading-6">{content}</div>
       ) : (
         <Markdown text={content} />
       )}
@@ -212,7 +212,7 @@ function Message({ role, content }: { role: string; content: string }) {
 
 function Markdown({ text }: { text: string }) {
   return (
-    <div className="max-w-3xl space-y-3 text-sm leading-6 [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_code]:rounded-sm [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_h1,h2,h3]:text-base [&_h1,h2,h3]:font-semibold [&_li]:ml-4 [&_ol]:list-decimal [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-secondary [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:list-disc">
+    <div className="max-w-3xl break-words space-y-3 text-sm leading-6 [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_code]:rounded-sm [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_h1,h2,h3]:text-base [&_h1,h2,h3]:font-semibold [&_li]:ml-4 [&_ol]:list-decimal [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-secondary [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:list-disc">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
@@ -252,17 +252,17 @@ function PrCard({ run }: { run: RunRow | undefined }) {
   try { reasons = run.policy_reasons ? JSON.parse(run.policy_reasons) : []; } catch {}
 
   return (
-    <div className="animate-fade-up flex items-center gap-3 rounded-xl border bg-card px-4 py-3">
-      <Badge variant="outline" className={cn("shrink-0 border-foreground/15 text-[10px] uppercase tracking-wide", tone)}>{label}</Badge>
-      {run.pr_url && (
-        <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
-          {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
-        </a>
-      )}
-      {run.branch && <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">{run.branch}</span>}
-      <span className="ml-auto shrink-0">
-        {reasons.length > 0 ? <span className="text-[10px] text-muted-foreground">{reasons[0]}</span> : null}
-      </span>
+    <div className="animate-fade-up flex flex-col gap-2 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-3">
+        <Badge variant="outline" className={cn("shrink-0 border-foreground/15 text-[10px] uppercase tracking-wide", tone)}>{label}</Badge>
+        {run.pr_url && (
+          <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
+            {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
+          </a>
+        )}
+        {run.branch && <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">{run.branch}</span>}
+      </div>
+      {reasons.length > 0 && <span className="break-words text-[10px] text-muted-foreground sm:ml-auto">{reasons[0]}</span>}
     </div>
   );
 }
