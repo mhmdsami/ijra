@@ -42,14 +42,16 @@ export function SessionView({ initial }: { initial: State }) {
 
   useEffect(() => {
     if (!anyActive) return;
+    let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
       const warm = Date.now() - dispatchAt < 15_000;
       timer = setTimeout(tick, document.visibilityState === "visible" ? (warm ? 1500 : 5000) : 15_000);
     };
     const tick = async () => {
+      if (!alive) return;
       if (document.visibilityState === "visible") await poll();
-      schedule();
+      if (alive) schedule();
     };
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
@@ -59,6 +61,7 @@ export function SessionView({ initial }: { initial: State }) {
     schedule();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      alive = false;
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };

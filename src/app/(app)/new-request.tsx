@@ -11,32 +11,46 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
   const [content, setContent] = useState("");
   const [model, setModel] = useState<string>(defaultModel);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function create() {
     const request = content.trim();
     if (!project || !request || busy) return;
     setBusy(true);
-    const sessionResponse = await fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project }),
-    });
-    if (!sessionResponse.ok) {
+    setError(null);
+    try {
+      const sessionResponse = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project }),
+      });
+      if (!sessionResponse.ok) {
+        const body = (await sessionResponse.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error ?? "Could not start a session.");
+        return;
+      }
+      const { id } = (await sessionResponse.json()) as { id: string };
+      const messageResponse = await fetch(`/api/sessions/${id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: request, model }),
+      });
+      if (!messageResponse.ok) {
+        const body = (await messageResponse.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error ?? "Could not send the request.");
+        return;
+      }
+      router.push(`/s/${id}`);
+    } catch {
+      setError("Could not send the request. Check your connection and try again.");
+    } finally {
       setBusy(false);
-      return;
     }
-    const { id } = (await sessionResponse.json()) as { id: string };
-    const messageResponse = await fetch(`/api/sessions/${id}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: request, model }),
-    });
-    router.push(`/s/${id}`);
-    if (!messageResponse.ok) setBusy(false);
   }
 
   return (
     <div className="rounded-xl border bg-card p-4 shadow-[0_20px_60px_-35px_rgb(0_0_0_/_0.9)]">
+      {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/40 px-3 py-2 text-xs text-destructive">{error}</p>}
       <Textarea
         value={content}
         onChange={(event) => setContent(event.target.value)}
