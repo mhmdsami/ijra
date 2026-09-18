@@ -39,6 +39,7 @@ export async function startRun(input: {
   model: string;
   mode: "fix" | "ask" | "auto";
   runId: string;
+  imageUrls?: string[];
 }) {
   await gh(`/repos/${RUNNER_REPO}/actions/workflows/dispatch.yml/dispatches`, {
     method: "POST",
@@ -51,6 +52,7 @@ export async function startRun(input: {
         model: input.model,
         mode: input.mode,
         run_id: input.runId,
+        images: JSON.stringify(input.imageUrls ?? []),
       },
     }),
   });

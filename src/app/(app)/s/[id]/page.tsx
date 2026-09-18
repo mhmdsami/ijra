@@ -16,7 +16,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     listModels(),
     getDefaultModel(),
   ]);
-  const models = modelRows.map((m) => ({ id: m.id, label: m.label }));
+  const models = modelRows.map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1 }));
   return (
     <SessionView
       key={session.id}

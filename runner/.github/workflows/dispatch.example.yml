@@ -26,6 +26,11 @@ on:
         required: false
         type: string
         default: "auto"
+      images:
+        description: "JSON array of signed image URLs to attach"
+        required: false
+        type: string
+        default: "[]"
       run_id:
         description: "Dashboard run id for webhook reporting"
         required: false

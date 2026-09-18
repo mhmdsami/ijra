@@ -14,3 +14,13 @@ export type CatalogModel = {
   vision: boolean;
   deprecated: boolean;
 };
+
+export type SessionImage = {
+  id: string;
+  session_id: string;
+  run_id: string | null;
+  mime: string;
+  width: number | null;
+  height: number | null;
+  created_at: number;
+};

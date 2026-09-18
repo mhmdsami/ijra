@@ -1,4 +1,5 @@
 import { env, now } from "./env";
+import type { SessionImage } from "./lib/types";
 
 export const DEFAULT_DAILY_LIMIT = 5;
 
@@ -159,6 +160,7 @@ export async function deleteUserRow(id: string) {
   await db.batch([
     db.prepare("DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
     db.prepare("DELETE FROM runs WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
+    db.prepare("DELETE FROM images WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
     db.prepare("DELETE FROM sessions WHERE owner_id = ?").bind(id),
     db.prepare("DELETE FROM user_projects WHERE userId = ?").bind(id),
     db.prepare("DELETE FROM user_limits WHERE user_id = ?").bind(id),
@@ -324,6 +326,50 @@ export async function createRun(
     .bind(id, sessionId, project, request, model, requestedBy, mode, t, t, project, ...activeRunStatuses, ...limitBinds)
     .run();
   return result.meta.changes === 1 ? id : null;
+}
+
+export async function addImage(input: { sessionId: string; mime: string; width: number | null; height: number | null; bytes: Uint8Array }) {
+  const id = crypto.randomUUID();
+  await env()
+    .DB.prepare("INSERT INTO images (id, session_id, mime, width, height, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, input.sessionId, input.mime, input.width, input.height, input.bytes, now())
+    .run();
+  return id;
+}
+
+export async function getImage(id: string) {
+  return env().DB.prepare("SELECT * FROM images WHERE id = ?").bind(id).first<SessionImage & { bytes: ArrayBuffer | number[] }>();
+}
+
+export async function listSessionImages(sessionId: string) {
+  const { results } = await env()
+    .DB.prepare("SELECT id, session_id, run_id, mime, width, height, created_at FROM images WHERE session_id = ? ORDER BY created_at")
+    .bind(sessionId)
+    .all<SessionImage>();
+  return results ?? [];
+}
+
+export async function countImages(ids: string[]) {
+  if (ids.length === 0) return 0;
+  const row = await env()
+    .DB.prepare(`SELECT COUNT(*) AS n FROM images WHERE id IN (${ids.map(() => "?").join(", ")})`)
+    .bind(...ids)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export async function countSessionImages(sessionId: string, ids: string[]) {
+  if (ids.length === 0) return 0;
+  const row = await env()
+    .DB.prepare(`SELECT COUNT(*) AS n FROM images WHERE session_id = ? AND id IN (${ids.map(() => "?").join(", ")})`)
+    .bind(sessionId, ...ids)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export async function setImagesRun(ids: string[], runId: string) {
+  if (ids.length === 0) return;
+  await env().DB.prepare(`UPDATE images SET run_id = ? WHERE id IN (${ids.map(() => "?").join(", ")})`).bind(runId, ...ids).run();
 }
 
 export async function deleteSession(sessionId: string) {

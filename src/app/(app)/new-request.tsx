@@ -4,14 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { ComposerControls } from "@/components/composer-controls";
+import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
 
-export function NewRequest({ projects, models, defaultModel }: { projects: string[]; models: { id: string; label: string }[]; defaultModel: string }) {
+export function NewRequest({ projects, models, defaultModel }: { projects: string[]; models: { id: string; label: string; vision: boolean }[]; defaultModel: string }) {
   const router = useRouter();
   const [project, setProject] = useState("");
   const [content, setContent] = useState("");
   const [model, setModel] = useState<string>(defaultModel);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const imageQueue = useImageQueue();
+  const modelSupportsImages = models.find((m) => m.id === model)?.vision ?? false;
 
   async function create() {
     const request = content.trim();
@@ -30,10 +33,11 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
         return;
       }
       const { id } = (await sessionResponse.json()) as { id: string };
+      const imageIds = imageQueue.images.length > 0 ? await uploadImages(id, imageQueue.images) : [];
       const messageResponse = await fetch(`/api/sessions/${id}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: request, model }),
+        body: JSON.stringify({ content: request, model, imageIds }),
       });
       if (!messageResponse.ok) {
         const body = (await messageResponse.json().catch(() => null)) as { error?: string } | null;
@@ -51,17 +55,23 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
   return (
     <div className="rounded-xl border bg-card p-4 shadow-[0_20px_60px_-35px_rgb(0_0_0_/_0.9)]">
       {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/40 px-3 py-2 text-xs text-destructive">{error}</p>}
+      <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
       <Textarea
         value={content}
         onChange={(event) => setContent(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); create(); }
         }}
+        onPaste={(event) => {
+          const files = [...event.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
+          if (files.length > 0 && modelSupportsImages) { event.preventDefault(); imageQueue.add(files); }
+        }}
         placeholder="Tell ijra what to fix"
         rows={3}
         className="min-h-20 resize-none border-0 bg-transparent px-0 py-0 text-sm leading-6 shadow-none focus-visible:ring-0 dark:bg-transparent"
       />
       <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
+        {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={busy || imageQueue.images.length >= 3} />}
         <label className="sr-only" htmlFor="project">Project</label>
         <select id="project" value={project} onChange={(event) => setProject(event.target.value)} className="max-w-[40%] appearance-none bg-transparent text-xs text-muted-foreground outline-none">
           <option value="" disabled>Choose a project</option>

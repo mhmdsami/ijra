@@ -12,11 +12,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { HeaderActions } from "@/app/header-actions";
 import { MobileThreads } from "@/components/mobile-threads";
 import { ComposerControls } from "@/components/composer-controls";
+import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
 import { projectConfig } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
 
-type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; models: { id: string; label: string }[]; defaultModel: string };
+type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; models: { id: string; label: string; vision: boolean }[]; defaultModel: string };
 const ACTIVE = new Set(["dispatching", "running"]);
 
 export function SessionView({ initial }: { initial: State }) {
@@ -24,6 +25,8 @@ export function SessionView({ initial }: { initial: State }) {
   const [input, setInput] = useState("");
     const [model, setModel] = useState<string>(initial.defaultModel);
   const [sending, setSending] = useState(false);
+  const imageQueue = useImageQueue();
+  const modelSupportsImages = state.models.find((m) => m.id === model)?.vision ?? false;
   const [sendError, setSendError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -81,12 +84,14 @@ export function SessionView({ initial }: { initial: State }) {
       runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, policy_status: "pending", policy_reasons: null, decision: null, decided_by: null, decided_at: null, decision_reason: null }],
     }));
     try {
+      const imageIds = imageQueue.images.length > 0 ? await uploadImages(initial.session.id, imageQueue.images) : [];
       const res = await fetch(`/api/sessions/${initial.session.id}/messages`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, model }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, model, imageIds }),
       });
       if (res.ok) {
         const data = (await res.json()) as Pick<State, "messages" | "runs">;
         setState((state) => ({ ...state, ...data }));
+        imageQueue.clear();
       } else {
         const body = await res.json().catch(() => null) as { error?: string } | null;
         setInput(content);
@@ -152,7 +157,7 @@ export function SessionView({ initial }: { initial: State }) {
               <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">The agent will make the change and open a pull request.</p>
             </div>
           )}
-          {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} />)}
+          {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} meta={m.meta} />)}
           {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} />}
           {!anyActive && <PrCard run={latestRun} />}
           <div ref={bottomRef} />
@@ -160,11 +165,19 @@ export function SessionView({ initial }: { initial: State }) {
 
         <div className="shrink-0 pb-4 pt-2 sm:pb-5">
           {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
-          <div className="flex items-end gap-3 rounded-xl border bg-card p-2.5 focus-within:border-primary/60 sm:p-3">
-            <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-            }} placeholder="Ask a question or describe a change" rows={2} className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
+          <div className="rounded-xl border bg-card p-2.5 focus-within:border-primary/60 sm:p-3">
+            <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
+            <div className="flex items-end gap-1.5">
+              {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={sending || imageQueue.images.length >= 3} />}
+              <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+              }} onPaste={(e) => {
+                const files = [...e.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
+                if (files.length > 0 && modelSupportsImages) { e.preventDefault(); imageQueue.add(files); }
+              }} placeholder="Ask a question or describe a change" rows={2} className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
+            </div>
           </div>
+          {imageQueue.error && <p role="alert" className="mt-2 text-xs text-destructive">{imageQueue.error}</p>}
           <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] text-muted-foreground">
             <span>Enter to send</span>
             <Quota refreshKey={state.runs.length} />
@@ -199,13 +212,26 @@ function Quota({ refreshKey }: { refreshKey?: number }) {
   return <span>{quota.used}/{quota.limit} used today</span>;
 }
 
-function Message({ role, content }: { role: string; content: string }) {
+function Message({ role, content, meta }: { role: string; content: string; meta?: string | null }) {
   const isUser = role === "user";
+  let imageIds: string[] = [];
+  try {
+    const parsed = meta ? (JSON.parse(meta) as { imageIds?: string[] }) : null;
+    if (Array.isArray(parsed?.imageIds)) imageIds = parsed.imageIds.filter((id) => typeof id === "string");
+  } catch {
+  }
   return (
     <article className="animate-fade-up border-l border-border pl-3 sm:pl-4">
       <p className={cn("mb-2 text-[10px] uppercase tracking-[0.14em]", isUser ? "text-primary" : "text-muted-foreground")}>{isUser ? "You" : "ijra"}</p>
       {isUser ? (
-        <div className="max-w-3xl break-words whitespace-pre-wrap text-sm leading-6">{content}</div>
+        <>
+          {imageIds.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
+            </div>
+          )}
+          <div className="max-w-3xl break-words whitespace-pre-wrap text-sm leading-6">{content}</div>
+        </>
       ) : (
         <Markdown text={content} />
       )}

@@ -9,7 +9,7 @@ import Link from "next/link";
 export default async function Home() {
   const user = await requireUser();
   const [modelRows, defaultModel] = await Promise.all([listModels(), getDefaultModel()]);
-  const models = modelRows.map((m) => ({ id: m.id, label: m.label }));
+  const models = modelRows.map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1 }));
   const projectIds = user.allowedProjects ?? projects().map((p) => p.id);
 
   return (
