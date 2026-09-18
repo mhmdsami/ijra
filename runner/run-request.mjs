@@ -468,11 +468,6 @@ try {
     sh(`git checkout -- ${drifted.join(" ")}`, { allowFail: true });
     changed = changed.filter((f) => !drifted.includes(f));
     outcome.changedFiles = changed;
-    emitProgress("stage", `committing ${changed.length} file(s)`);
-  outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
-  } else {
-    emitProgress("stage", `committing ${changed.length} file(s)`);
-  outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
   }
 
   const titleMatch = agentSummary.match(/^Title:\s*(.+)$/m);
