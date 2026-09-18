@@ -13,12 +13,21 @@ async function validSignature(body: string, timestamp: string, signature: string
   return [...signature].reduce((diff, char, index) => diff | (char.charCodeAt(0) ^ expected.charCodeAt(index)), 0) === 0;
 }
 
+function parseJson(body: string) {
+  try {
+    return JSON.parse(body) ?? {};
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   const body = await req.text();
   if (!(await validSignature(body, req.headers.get("x-ijra-timestamp") ?? "", req.headers.get("x-ijra-signature") ?? ""))) {
     return NextResponse.json({ error: "invalid runner signature" }, { status: 401 });
   }
-  const payload = JSON.parse(body) as { runId?: string; status?: string; summary?: string; outcome?: { prUrl?: string; branch?: string; policyReasons?: string[]; title?: string } };
+  const payload = parseJson(body) as { runId?: string; status?: string; summary?: string; outcome?: { prUrl?: string; branch?: string; policyReasons?: string[]; title?: string } };
+  if (!payload) return NextResponse.json({ error: "invalid body" }, { status: 400 });
   if (!payload.runId || !payload.status) return NextResponse.json({ error: "runId and status are required" }, { status: 400 });
   const fingerprint = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${req.headers.get("x-ijra-timestamp")}.${body}`)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   const replay = await env().DB.prepare("INSERT OR IGNORE INTO runner_callbacks (fingerprint, run_id, received_at) VALUES (?, ?, ?)").bind(fingerprint, payload.runId, Date.now()).run();
