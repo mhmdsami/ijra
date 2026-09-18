@@ -303,12 +303,14 @@ try {
   outcome.changedFiles = changed;
   outcome.agentSummary = agentSummary;
   const protectedPath = /(^|\/)(package(-lock)?\.json|bun\.lockb?|pnpm-lock\.yaml|yarn\.lock|\.github\/|migrations?\/|src\/lib\/|src\/app\/api\/|auth)/i;
-  const disallowed = changed.filter((file) => protectedPath.test(file) || !(cfg.safePaths ?? []).some((pattern) => glob(pattern).test(file)));
+  const protectedHits = changed.filter((file) => protectedPath.test(file));
+  const outsideZone = changed.filter((file) => !protectedPath.test(file) && !(cfg.safePaths ?? []).some((pattern) => glob(pattern).test(file)));
   const lineStats = sh("git diff --numstat", "line-stats", { env: cleanEnv }).stdout.trim().split("\n").filter(Boolean);
   outcome.changedLines = lineStats.reduce((total, line) => { const [added, deleted] = line.split("\t"); return total + (Number(added) || 0) + (Number(deleted) || 0); }, 0);
   if (changed.length > 12) outcome.policyReasons.push(`changed ${changed.length} files; limit is 12`);
   if (outcome.changedLines > 400) outcome.policyReasons.push(`changed ${outcome.changedLines} lines; limit is 400`);
-  if (disallowed.length) outcome.policyReasons.push(`review required: ${disallowed.join(", ")}`);
+  if (protectedHits.length) outcome.policyReasons.push(`protected path, needs a manual change: ${protectedHits.join(", ")}`);
+  if (outsideZone.length) outcome.policyReasons.push(`outside the safe zone: ${outsideZone.join(", ")}`);
   if (outcome.policyReasons.length) {
     outcome.status = "blocked";
     outcome.agentSummary = [outcome.agentSummary, `Blocked by policy: ${outcome.policyReasons.join("; ")}`].filter(Boolean).join("\n\n");
