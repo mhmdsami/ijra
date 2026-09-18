@@ -23,7 +23,7 @@ export function ComposerControls({
       <select
         value={model}
         onChange={(e) => onModel(e.target.value)}
-        className="cursor-pointer appearance-none rounded-full py-1.5 pl-3 pr-1 text-[10px] tracking-wide text-foreground/60 outline-none hover:text-foreground"
+        className="max-w-[42vw] cursor-pointer appearance-none truncate rounded-full py-1.5 pl-3 pr-1 text-[10px] tracking-wide text-foreground/60 outline-none hover:text-foreground sm:max-w-none"
         aria-label="Model"
       >
         {models.map((m) => (

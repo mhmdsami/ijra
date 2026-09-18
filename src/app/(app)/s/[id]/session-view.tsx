@@ -119,22 +119,22 @@ export function SessionView({ initial }: { initial: State }) {
 
   return (
     <div className="animate-fade-up flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-        <div className="flex items-center gap-2">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2">
           <MobileThreads />
           <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
           <Link
             href={`https://github.com/${projectConfig(state.session.project).repo}`}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full border border-foreground/15 px-2.5 py-0.5 text-[10px] tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+            className="max-w-[28vw] truncate rounded-full border border-foreground/15 px-2.5 py-0.5 text-[10px] tracking-wide text-muted-foreground transition-colors hover:text-foreground"
           >
             {state.session.project}
           </Link>
           {state.session.owner_id && state.session.owner_id !== state.viewerId && state.ownerEmail && (
-            <span className="text-[10px] text-muted-foreground" title="Session owner">{state.ownerEmail}</span>
+            <span className="hidden truncate text-[10px] text-muted-foreground sm:inline" title="Session owner">{state.ownerEmail}</span>
           )}
           <Button onClick={deleteThread} variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete thread">
             <Trash2 className="size-3.5" />
@@ -143,8 +143,8 @@ export function SessionView({ initial }: { initial: State }) {
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-6 sm:px-10">
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto py-8 sm:py-12">
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-4 sm:px-10">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-5 sm:gap-6 sm:py-12">
           {state.messages.length === 0 && (
             <div className="flex flex-1 flex-col justify-center">
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary">New request</p>
@@ -160,12 +160,12 @@ export function SessionView({ initial }: { initial: State }) {
 
         <div className="shrink-0 pb-4 pt-2 sm:pb-5">
           {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
-          <div className="flex items-end gap-3 rounded-xl border bg-card p-3 focus-within:border-primary/60">
+          <div className="flex items-end gap-3 rounded-xl border bg-card p-2.5 focus-within:border-primary/60 sm:p-3">
             <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-            }} placeholder="Ask a question or describe a change" rows={2} className="min-h-12 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent" />
+            }} placeholder="Ask a question or describe a change" rows={2} className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
           </div>
-          <p className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">
+          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] text-muted-foreground">
             <span>Enter to send</span>
             <Quota refreshKey={state.runs.length} />
             <span className="ml-auto">
@@ -202,7 +202,7 @@ function Quota({ refreshKey }: { refreshKey?: number }) {
 function Message({ role, content }: { role: string; content: string }) {
   const isUser = role === "user";
   return (
-    <article className="animate-fade-up border-l border-border pl-4">
+    <article className="animate-fade-up border-l border-border pl-3 sm:pl-4">
       <p className={cn("mb-2 text-[10px] uppercase tracking-[0.14em]", isUser ? "text-primary" : "text-muted-foreground")}>{isUser ? "You" : "ijra"}</p>
       {isUser ? (
         <div className="max-w-3xl break-words whitespace-pre-wrap text-sm leading-6">{content}</div>
@@ -237,6 +237,17 @@ function StatusLine({ runs, onCancel }: { runs: RunRow[]; onCancel: () => void }
   );
 }
 
+function shortReason(reason: string) {
+  const idx = reason.indexOf(":");
+  if (idx === -1) return reason;
+  const paths = reason
+    .slice(idx + 1)
+    .split(",")
+    .map((part) => part.trim().split("/").filter(Boolean).pop() ?? part.trim())
+    .join(", ");
+  return `${reason.slice(0, idx)}: ${paths}`;
+}
+
 function PrCard({ run }: { run: RunRow | undefined }) {
   if (!run || (!run.pr_url && run.status !== "blocked")) return null;
 
@@ -265,7 +276,9 @@ function PrCard({ run }: { run: RunRow | undefined }) {
         )}
         {run.branch && <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">{run.branch}</span>}
       </div>
-      {reasons.length > 0 && <span className="break-words text-[10px] text-muted-foreground sm:ml-auto">{reasons[0]}</span>}
+      {reasons.length > 0 && (
+        <span className="text-[10px] text-muted-foreground sm:ml-auto" title={reasons[0]}>{shortReason(reasons[0])}</span>
+      )}
     </div>
   );
 }
