@@ -70,21 +70,25 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
         rows={3}
         className="min-h-20 resize-none border-0 bg-transparent px-0 py-0 text-sm leading-6 shadow-none focus-visible:ring-0 dark:bg-transparent"
       />
-      <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
-        {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={busy || imageQueue.images.length >= 3} />}
-        <label className="sr-only" htmlFor="project">Project</label>
-        <select id="project" value={project} onChange={(event) => setProject(event.target.value)} className="max-w-[40%] appearance-none bg-transparent text-xs text-muted-foreground outline-none">
-          <option value="" disabled>Choose a project</option>
-          {projects.map((id) => <option key={id} value={id}>{id}</option>)}
-        </select>
-        <ComposerControls
-          model={model}
-          models={models}
-          onModel={setModel}
-          onSend={create}
-          busy={busy}
-          disabled={!project || !content.trim()}
-        />
+      <div className="mt-3 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex min-w-0 items-center gap-1 sm:flex-1">
+          {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={busy || imageQueue.images.length >= 3} />}
+          <label className="sr-only" htmlFor="project">Project</label>
+          <select id="project" value={project} onChange={(event) => setProject(event.target.value)} className="min-w-0 flex-1 appearance-none truncate bg-transparent text-xs text-muted-foreground outline-none sm:max-w-[40%] sm:flex-none">
+            <option value="" disabled>Choose a project</option>
+            {projects.map((id) => <option key={id} value={id}>{id}</option>)}
+          </select>
+        </div>
+        <div className="flex shrink-0 justify-end sm:justify-start">
+          <ComposerControls
+            model={model}
+            models={models}
+            onModel={setModel}
+            onSend={create}
+            busy={busy}
+            disabled={!project || !content.trim()}
+          />
+        </div>
       </div>
     </div>
   );
