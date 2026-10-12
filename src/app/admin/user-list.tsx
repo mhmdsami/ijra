@@ -25,6 +25,7 @@ export function UserList({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search by email"
+          aria-label="Search users by email"
           className="h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs outline-none focus:border-primary/60"
         />
       )}

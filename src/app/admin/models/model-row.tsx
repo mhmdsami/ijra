@@ -1,12 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { addModelAction, removeModelAction, setDefaultModelAction } from "../actions";
 import { cn } from "@/lib/utils";
 
-function lastUsed(ts: number | null | undefined) {
+function lastUsed(ts: number | null | undefined, now: number) {
   if (!ts) return "never used";
-  const mins = Math.max(0, Math.round((Date.now() - ts) / 60_000));
+  const mins = Math.max(0, Math.round((now - ts) / 60_000));
   if (mins < 60) return `used ${mins}m ago`;
   const hours = Math.round(mins / 60);
   if (hours < 48) return `used ${hours}h ago`;
@@ -23,11 +23,18 @@ export function ModelRow({
   stale?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+  // rendered after hydration so the server and client markup agree
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => setNow(Date.now()), []);
 
   function run(action: (formData: FormData) => Promise<void>, fields: Record<string, string>) {
     const form = new FormData();
     for (const [k, v] of Object.entries(fields)) form.set(k, v);
-    startTransition(() => void action(form));
+    setActionError(null);
+    startTransition(() => {
+      action(form).catch(() => setActionError("failed, try again"));
+    });
   }
 
   return (
@@ -40,7 +47,7 @@ export function ModelRow({
           {model.isDefault && " · default"}
           {stale ? " · not in catalog" : model.unavailable && " · unavailable"}
           {" · "}
-          {usage ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last)}` : lastUsed(null)}
+          {usage ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last, now ?? 0)}` : lastUsed(null, now ?? 0)}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
@@ -56,8 +63,9 @@ export function ModelRow({
             </button>
             <button
               type="button"
+              disabled={pending}
               onClick={() => run(removeModelAction, { id: model.id })}
-              className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-destructive"
+              className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-destructive disabled:opacity-30"
             >
               remove
             </button>

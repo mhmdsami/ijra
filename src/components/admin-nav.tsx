@@ -17,6 +17,7 @@ export function AdminNav() {
         <Link
           key={tab.href}
           href={tab.href}
+          aria-current={pathname === tab.href ? "page" : undefined}
           className={cn(
             "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide transition-colors",
             pathname === tab.href ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"

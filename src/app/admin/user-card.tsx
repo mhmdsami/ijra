@@ -31,17 +31,14 @@ export function UserCard({
   const [draft, setDraft] = useState<Record<string, "ask" | "write">>(initial);
   const [draftLimit, setDraftLimit] = useState<string>(user.limit === null ? "" : String(user.limit));
   const [pending, startTransition] = useTransition();
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial) || draftLimit !== (user.limit === null ? "" : String(user.limit));
+  const limitStored = user.limit === null ? "" : String(user.limit);
+  const limitInvalid = draftLimit.trim() !== "" && (!/^\d+$/.test(draftLimit.trim()) || Number(draftLimit) < 1 || Number(draftLimit) > 1000);
+  const dirty = (JSON.stringify(draft) !== JSON.stringify(initial) || draftLimit !== limitStored) && !limitInvalid;
 
   useEffect(() => {
     setDraft(Object.fromEntries(user.projects.map((g) => [g.project, g.canWrite ? "write" : "ask"] as const)));
     setDraftLimit(user.limit === null ? "" : String(user.limit));
   }, [user.projects, user.limit]);
-
-  function save() {
-    const form = document.getElementById(`access-${user.id}`) as HTMLFormElement;
-    startTransition(() => form.requestSubmit());
-  }
 
   return (
     <div className="rounded-xl border bg-card p-4">
@@ -92,6 +89,7 @@ export function UserCard({
                   <button
                     key={l}
                     type="button"
+                    aria-pressed={level === l}
                     onClick={() => setDraft((d) => ({ ...d, [project]: l }))}
                     className={cn(
                       "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide transition-colors",
@@ -126,8 +124,8 @@ export function UserCard({
               ))}
             </select>
           )}
-          <label className="flex items-center gap-2 pt-1">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">daily limit</span>
+          <label className="flex items-center gap-2 pt-1" title={limitInvalid ? "daily limit must be 1 to 1000" : undefined}>
+            <span className={cn("text-[10px] uppercase tracking-wide", limitInvalid ? "text-destructive" : "text-muted-foreground")}>daily limit</span>
             <input
               type="number"
               min={1}
@@ -152,7 +150,7 @@ export function UserCard({
             </button>
             <button
               type="button"
-              onClick={() => setDraft(initial)}
+              onClick={() => { setDraft(initial); setDraftLimit(limitStored); }}
               disabled={!dirty || pending}
               className="rounded-full border border-border px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
             >

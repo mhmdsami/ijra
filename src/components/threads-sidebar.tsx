@@ -43,7 +43,7 @@ export function ThreadsSidebar() {
   }
 
   return (
-    <aside className="hidden w-60 shrink-0 flex-col border-r md:flex">
+    <aside className="hidden w-60 shrink-0 flex-col border-r transition-[width] duration-150 md:flex">
       <div className="flex h-14 shrink-0 items-center justify-between border-b px-3">
         <span className="text-xs text-muted-foreground">Threads</span>
         <div className="flex items-center gap-0.5">
@@ -66,6 +66,7 @@ export function ThreadsSidebar() {
                 <li key={session.id}>
                   <Link
                     href={href}
+                    aria-current={pathname === href ? "page" : undefined}
                     onClick={() => { if (pathname !== href) setPending(href); }}
                     className={cn(
                       "animate-fade-up relative block rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary",

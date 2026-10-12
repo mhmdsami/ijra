@@ -37,11 +37,16 @@ export function SessionView({ initial }: { initial: State }) {
   const dispatchAt = activeRun?.dispatch_at ?? 0;
   const latestRun = [...state.runs].reverse().find((r) => !ACTIVE.has(r.status) && (r.pr_url || r.status === "blocked"));
 
+  const [pollFailing, setPollFailing] = useState(false);
   const poll = useCallback(async () => {
-    const res = await fetch(`/api/sessions/${initial.session.id}`, { cache: "no-store" });
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/sessions/${initial.session.id}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as Pick<State, "messages" | "runs">;
+      setPollFailing(false);
       setState((state) => ({ ...state, ...data }));
+    } catch {
+      setPollFailing(true);
     }
   }, [initial.session.id]);
 
@@ -97,7 +102,12 @@ export function SessionView({ initial }: { initial: State }) {
     };
   }, [anyActive, dispatchAt, poll]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [state.messages.length]);
+  useEffect(() => {
+    const scroller = bottomRef.current?.parentElement;
+    if (!scroller) return;
+    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 240;
+    if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [state.messages.length]);
 
   async function send() {
     const content = input.trim();
@@ -121,11 +131,11 @@ export function SessionView({ initial }: { initial: State }) {
         imageQueue.clear();
       } else {
         const body = await res.json().catch(() => null) as { error?: string } | null;
-        setInput(content);
+        setInput((current) => (current.trim() === "" ? content : current));
         setSendError(body?.error ?? "Unable to send request.");
       }
     } catch {
-      setInput(content);
+      setInput((current) => (current.trim() === "" ? content : current));
       setSendError("Unable to send request. Check your connection and try again.");
     } finally {
       setSending(false);
@@ -145,7 +155,11 @@ export function SessionView({ initial }: { initial: State }) {
 
   async function deleteThread() {
     if (!confirm("Delete this thread?")) return;
-    await fetch(`/api/sessions/${initial.session.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/sessions/${initial.session.id}`, { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) {
+      setSendError("Could not delete the thread. Try again.");
+      return;
+    }
     router.push("/");
   }
 
@@ -181,11 +195,12 @@ export function SessionView({ initial }: { initial: State }) {
             <div className="flex flex-1 flex-col justify-center">
               <p className="text-[11px] uppercase tracking-[0.14em] text-primary">New request</p>
               <h1 className="mt-3 text-2xl tracking-[-0.04em]">Describe the change.</h1>
-              <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">The agent will make the change and open a pull request.</p>
+              <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">{initial.canWrite ? "The agent will make the change and open a pull request." : "Ask questions about this repository. Changes need a project grant."}</p>
             </div>
           )}
           {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} meta={m.meta} />)}
           {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />}
+          {anyActive && pollFailing && <p className="text-[10px] text-muted-foreground">Live updates are failing. The run continues on GitHub.</p>}
           {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
             <div className="animate-fade-up flex flex-col gap-2 rounded-xl border bg-card/60 p-3">
               {live.tools.length > 0 && (
@@ -209,11 +224,11 @@ export function SessionView({ initial }: { initial: State }) {
             <div className="flex items-end gap-1.5">
               {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={sending || imageQueue.images.length >= 3} />}
               <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
               }} onPaste={(e) => {
                 const files = [...e.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
                 if (files.length > 0 && modelSupportsImages) { e.preventDefault(); imageQueue.add(files); }
-              }} placeholder="Ask a question or describe a change" rows={2} className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
+              }} placeholder="Ask a question or describe a change" rows={2} aria-label="Message to ijra" className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
             </div>
           </div>
           {imageQueue.error && <p role="alert" className="mt-2 text-xs text-destructive">{imageQueue.error}</p>}

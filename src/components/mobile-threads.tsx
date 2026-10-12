@@ -3,7 +3,7 @@
 import { Menu, MessageSquarePlus, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { useSessions } from "@/components/sessions-context";
 import { cn } from "@/lib/utils";
@@ -18,21 +18,34 @@ export function MobileThreads() {
   const { sessions } = useSessions();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      openerRef.current?.focus();
+    };
+  }, [open]);
 
   return (
     <div className="md:hidden">
-      <button onClick={() => setOpen(true)} className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Open threads">
+      <button ref={openerRef} onClick={() => setOpen(true)} className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Open threads">
         <Menu className="size-4" />
       </button>
       {open && (
-        <div className="fixed inset-0 z-50">
-          <button className="absolute inset-0 bg-background/75 backdrop-blur-sm" onClick={() => setOpen(false)} aria-label="Close threads" />
-          <aside className="relative flex h-full w-[min(19rem,86vw)] flex-col border-r bg-background shadow-2xl">
+        <div className="fixed inset-0 z-50" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
+          <button className="absolute inset-0 bg-background/75 backdrop-blur-sm" onClick={() => setOpen(false)} aria-label="Close threads" tabIndex={-1} />
+          <aside role="dialog" aria-modal="true" aria-label="Threads" className="relative flex h-full w-[min(19rem,86vw)] flex-col border-r bg-background shadow-2xl">
             <div className="flex h-14 items-center justify-between border-b px-4">
               <span className="text-xs text-muted-foreground">Threads</span>
               <div className="flex items-center gap-1">
                 <Link href="/" onClick={() => setOpen(false)} className="rounded-md p-2 text-primary hover:bg-secondary" aria-label="New thread"><MessageSquarePlus className="size-4" /></Link>
-                <button onClick={() => setOpen(false)} className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Close threads"><X className="size-4" /></button>
+                <button ref={closeRef} onClick={() => setOpen(false)} className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Close threads"><X className="size-4" /></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-2">

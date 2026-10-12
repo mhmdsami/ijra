@@ -36,6 +36,7 @@ export function ModelCatalog({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search models"
+          aria-label="Search models"
           className="h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs outline-none focus:border-primary/60"
         />
         <Sections shown={shown} usage={usage} hasQuery={query !== ""} />
