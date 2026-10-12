@@ -36,7 +36,7 @@ export default async function Home() {
         ) : (
           <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-4 py-12 sm:px-8">
             <div>
-              <p className="animate-fade-up text-2xl italic leading-[0.9] tracking-[-0.06em] sm:text-3xl" style={{ fontFamily: "var(--font-display)" }}>What can I fix?</p>
+              <h1 className="animate-fade-up text-2xl italic leading-[0.9] tracking-[-0.06em] sm:text-3xl" style={{ fontFamily: "var(--font-display)" }}>What can I fix?</h1>
               <p className="animate-fade-up mt-4 max-w-md text-sm leading-6 text-muted-foreground [animation-delay:40ms]">Start with the change you need. ijra will work in your repo and open a pull request.</p>
             </div>
             <div className="animate-fade-up mt-8 [animation-delay:80ms]">

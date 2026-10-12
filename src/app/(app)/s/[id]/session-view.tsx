@@ -190,6 +190,7 @@ export function SessionView({ initial }: { initial: State }) {
       </header>
 
       <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-4 sm:px-10">
+        {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-5 sm:gap-6 sm:py-12">
           {state.messages.length === 0 && (
             <div className="flex flex-1 flex-col justify-center">
@@ -199,10 +200,16 @@ export function SessionView({ initial }: { initial: State }) {
             </div>
           )}
           {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} meta={m.meta} />)}
-          {anyActive && <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />}
-          {anyActive && pollFailing && <p className="text-[10px] text-muted-foreground">Live updates are failing. The run continues on GitHub.</p>}
+          {anyActive && (
+            <div role="status">
+              <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />
+            </div>
+          )}
+          {anyActive && pollFailing && (
+            <p role="status" className="text-[10px] text-muted-foreground">Live updates are failing. The run continues on GitHub.</p>
+          )}
           {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
-            <div className="animate-fade-up flex flex-col gap-2 rounded-xl border bg-card/60 p-3">
+            <div role="log" aria-label="Live agent output" className="animate-fade-up flex flex-col gap-2 rounded-xl border bg-card/60 p-3">
               {live.tools.length > 0 && (
                 <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
                   {live.tools.map((tool, index) => <span key={`${index}-${tool}`} className="truncate">› {tool}</span>)}

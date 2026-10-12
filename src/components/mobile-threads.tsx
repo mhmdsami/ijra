@@ -21,6 +21,16 @@ export function MobileThreads() {
   const closeRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<HTMLButtonElement>(null);
 
+  function trapTab(e: React.KeyboardEvent) {
+    if (e.key !== "Tab") return;
+    const focusables = closeRef.current?.closest("aside")?.querySelectorAll<HTMLAnchorElement | HTMLButtonElement>("a[href], button:not([disabled])");
+    if (!focusables || focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
   useEffect(() => {
     if (!open) return;
     closeRef.current?.focus();
@@ -40,7 +50,7 @@ export function MobileThreads() {
       {open && (
         <div className="fixed inset-0 z-50" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
           <button className="absolute inset-0 bg-background/75 backdrop-blur-sm" onClick={() => setOpen(false)} aria-label="Close threads" tabIndex={-1} />
-          <aside role="dialog" aria-modal="true" aria-label="Threads" className="relative flex h-full w-[min(19rem,86vw)] flex-col border-r bg-background shadow-2xl">
+          <aside role="dialog" aria-modal="true" aria-label="Threads" onKeyDown={trapTab} className="relative flex h-full w-[min(19rem,86vw)] flex-col border-r bg-background shadow-2xl">
             <div className="flex h-14 items-center justify-between border-b px-4">
               <span className="text-xs text-muted-foreground">Threads</span>
               <div className="flex items-center gap-1">
