@@ -228,31 +228,29 @@ export function SessionView({ initial }: { initial: State }) {
           {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
           <div className="rounded-xl border bg-card p-2.5 focus-within:border-primary/60 sm:p-3">
             <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
-            <div className="flex items-end gap-1.5">
+            <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
+            }} onPaste={(e) => {
+              const files = [...e.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
+              if (files.length > 0 && modelSupportsImages) { e.preventDefault(); imageQueue.add(files); }
+            }} placeholder="Ask a question or describe a change" rows={2} aria-label="Message to ijra" className="min-h-10 w-full resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2.5 text-[10px] text-muted-foreground">
               {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={sending || imageQueue.images.length >= 3} />}
-              <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
-              }} onPaste={(e) => {
-                const files = [...e.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
-                if (files.length > 0 && modelSupportsImages) { e.preventDefault(); imageQueue.add(files); }
-              }} placeholder="Ask a question or describe a change" rows={2} aria-label="Message to ijra" className="min-h-10 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
+              <span className="hidden sm:inline">Enter to send</span>
+              <Quota refreshKey={state.runs.length} />
+              <span className="ml-auto">
+                <ComposerControls
+                  model={model}
+                  models={state.models}
+                  onModel={setModel}
+                  onSend={send}
+                  busy={sending}
+                  disabled={!input.trim()}
+                />
+              </span>
             </div>
           </div>
           {imageQueue.error && <p role="alert" className="mt-2 text-xs text-destructive">{imageQueue.error}</p>}
-          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-[10px] text-muted-foreground">
-            <span>Enter to send</span>
-            <Quota refreshKey={state.runs.length} />
-            <span className="ml-auto">
-              <ComposerControls
-                model={model}
-                models={state.models}
-                onModel={setModel}
-                onSend={send}
-                busy={sending}
-                disabled={!input.trim()}
-              />
-            </span>
-          </p>
         </div>
       </div>
     </div>
