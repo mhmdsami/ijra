@@ -28,3 +28,10 @@ test("signed urls verify, and fail when expired or tampered", async () => {
   assert.equal(await verifyImageSignature("image-1", expired.exp, expired.sig, key), false);
   assert.equal(await verifyImageSignature("image-1", "not-a-number", sig, key), false);
 });
+
+test("splits a canvas data url into mime and base64", async () => {
+  const { splitDataUrl } = await import("./images.ts");
+  assert.deepEqual(splitDataUrl("data:image/webp;base64,UklGRhog"), { mime: "image/webp", data: "UklGRhog" });
+  assert.deepEqual(splitDataUrl("data:image/png;base64,iVBOR"), { mime: "image/png", data: "iVBOR" });
+  assert.deepEqual(splitDataUrl("garbage"), { mime: "", data: "" });
+});

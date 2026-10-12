@@ -2,9 +2,11 @@
 
 import { ImagePlus, X } from "lucide-react";
 import { useRef, useState } from "react";
-import { MAX_IMAGES_PER_MESSAGE } from "@/lib/images";
+
 
 export type PendingImage = { key: string; mime: string; width: number; height: number; data: string };
+
+import { MAX_IMAGES_PER_MESSAGE, splitDataUrl } from "@/lib/images";
 
 const MAX_EDGE = 1600;
 
@@ -21,13 +23,11 @@ async function downscale(file: File): Promise<PendingImage> {
   context.drawImage(bitmap, 0, 0, width, height);
   bitmap.close();
   const dataUrl = canvas.toDataURL("image/webp", 0.8);
-  const comma = dataUrl.indexOf(",");
   return {
     key: crypto.randomUUID(),
-    mime: dataUrl.slice(5, dataUrl.indexOf(";", comma)),
+    ...splitDataUrl(dataUrl),
     width,
     height,
-    data: dataUrl.slice(comma + 1),
   };
 }
 

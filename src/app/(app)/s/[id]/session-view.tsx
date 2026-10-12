@@ -134,9 +134,9 @@ export function SessionView({ initial }: { initial: State }) {
         setInput((current) => (current.trim() === "" ? content : current));
         setSendError(body?.error ?? "Unable to send request.");
       }
-    } catch {
+    } catch (e) {
       setInput((current) => (current.trim() === "" ? content : current));
-      setSendError("Unable to send request. Check your connection and try again.");
+      setSendError(e instanceof Error && e.message ? e.message : "Unable to send request. Check your connection and try again.");
     } finally {
       setSending(false);
       poll();

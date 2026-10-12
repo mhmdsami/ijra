@@ -43,3 +43,12 @@ export async function verifyImageSignature(id: string, exp: string, sig: string,
   if (!/^\d+$/.test(exp) || Number(exp) < Date.now()) return false;
   return constantTimeEqual(sig, await hmac(`${id}.${exp}`, key));
 }
+
+export function splitDataUrl(dataUrl: string) {
+  const comma = dataUrl.indexOf(",");
+  const meta = comma === -1 ? "" : dataUrl.slice(0, comma);
+  return {
+    mime: meta.startsWith("data:") ? meta.slice(5, meta.indexOf(";")) : "",
+    data: comma === -1 ? "" : dataUrl.slice(comma + 1),
+  };
+}
