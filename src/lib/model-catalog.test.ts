@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { availableModel, modelCatalog } from "./model-catalog.ts";
+import { availableModel, modelCatalog, resetModelCatalogCache } from "./model-catalog.ts";
 
 test("catalog status controls enablement without a model denylist", async (t) => {
+  resetModelCatalogCache();
   t.mock.method(globalThis, "fetch", async () => Response.json({
     "opencode-go": { models: {
       "retired-example": { name: "Retired example", status: "deprecated" },
@@ -17,6 +18,7 @@ test("catalog status controls enablement without a model denylist", async (t) =>
 });
 
 test("catalog failures cannot authorize enabling a model", async (t) => {
+  resetModelCatalogCache();
   const fetch = t.mock.method(globalThis, "fetch", async () => new Response(null, { status: 503 }));
   await assert.rejects(availableModel("active-example"), /Could not load/);
   fetch.mock.mockImplementation(async () => Response.json({}));
