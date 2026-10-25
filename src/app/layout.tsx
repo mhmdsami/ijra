@@ -1,12 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Geist_Mono, Instrument_Serif } from "next/font/google";
 import "./globals.css";
-
-const sans = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-  display: "swap",
-});
 
 const mono = Geist_Mono({
   subsets: ["latin"],
@@ -52,7 +46,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable} ${display.variable} dark`}>
+    <html lang="en" className={`${mono.variable} ${display.variable} dark`}>
       <body className="min-h-dvh bg-background text-foreground">
         <main className="flex min-h-dvh w-full flex-col">{children}</main>
       </body>
