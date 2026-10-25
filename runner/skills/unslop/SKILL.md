@@ -1,6 +1,8 @@
 ---
 name: unslop
 description: Cut AI tells from any writing. Must always apply.
+credit: Lauren Tan's unslop (pstack)
+credit-url: https://github.com/cursor/plugins/tree/main/pstack/skills/unslop
 ---
 
 # Unslop
