@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUp, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 
 export function ComposerControls({
@@ -10,6 +11,7 @@ export function ComposerControls({
   onSend,
   busy,
   disabled,
+  className,
 }: {
   model: string;
   models: { id: string; label: string }[];
@@ -17,13 +19,14 @@ export function ComposerControls({
   onSend: () => void;
   busy?: boolean;
   disabled?: boolean;
+  className?: string;
 }) {
   return (
-    <span className="flex shrink-0 items-center gap-0.5 rounded-full border border-foreground/25 bg-card p-0.5">
+    <span className={cn("flex min-w-0 items-center gap-0.5 rounded-lg border bg-surface-2/40 p-0.5", className)}>
       <select
         value={model}
         onChange={(e) => onModel(e.target.value)}
-        className="max-w-[42vw] cursor-pointer appearance-none truncate rounded-full py-2 pl-3 pr-1 text-[10px] tracking-wide text-foreground/60 outline-none hover:text-foreground sm:py-1.5 sm:max-w-none"
+        className="w-36 min-w-0 flex-1 cursor-pointer appearance-none truncate rounded-md bg-transparent py-1.5 pr-1 pl-2 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground sm:w-44 sm:flex-none"
         aria-label="Model"
       >
         {models.map((m) => (
@@ -35,7 +38,7 @@ export function ComposerControls({
       <button
         onClick={onSend}
         disabled={disabled || busy}
-        className="mr-0.5 rounded-full p-2 text-foreground transition-colors hover:bg-secondary disabled:opacity-40 sm:p-1.5"
+        className="shrink-0 rounded-md p-1.5 text-foreground transition-[background-color,transform,opacity] hover:bg-surface-3 active:scale-95 disabled:opacity-40"
         aria-label="Send request"
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}

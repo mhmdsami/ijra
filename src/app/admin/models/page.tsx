@@ -30,9 +30,9 @@ export default async function ModelsPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-        <Link href="/" className="group flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground">
+        <Link href="/" className="group flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
-          <span className="text-2xl italic tracking-[-0.07em] text-foreground" style={{ fontFamily: "var(--font-display)" }}>ijra</span>
+          <span className="type-display text-2xl leading-none text-foreground">ijra</span>
         </Link>
         <div className="flex items-center gap-2">
           <AdminNav />
@@ -42,14 +42,14 @@ export default async function ModelsPage() {
 
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-3 px-4 py-6 sm:px-6 sm:py-8">
         <div className="mb-1">
-          <h1 className="text-lg text-foreground">Models</h1>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">Models</h1>
+          <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
             Enabled models show up in the composer. Sorting is by usage.
           </p>
         </div>
 
         {catalog === null && (
-          <p className="text-xs text-muted-foreground">Could not reach the model catalog. Try again shortly.</p>
+          <p className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">Could not reach the model catalog. Try again shortly.</p>
         )}
 
         <ModelCatalog enabled={enabledItems} available={available} missing={missing} usage={usage} />

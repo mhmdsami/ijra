@@ -41,27 +41,27 @@ export function UserCard({
   }, [user.projects, user.limit]);
 
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-lg border bg-card p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="min-w-0 truncate text-xs font-medium">
+        <span className="min-w-0 truncate text-sm font-medium">
           {user.email}
-          {isMe && <span className="ml-2 text-[10px] text-muted-foreground">you</span>}
+          {isMe && <span className="ml-2 text-2xs font-normal text-text-tertiary">you</span>}
         </span>
         {!isAdmin && !isMe && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1">
             {canChangeRole && (
               <form action={setAdminAction}>
                 <input type="hidden" name="userId" value={user.id} />
                 <input type="hidden" name="admin" value="on" />
-                <button type="submit" className="text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground">
-                  make admin
+                <button type="submit" className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground">
+                  Make admin
                 </button>
               </form>
             )}
             {canDelete && (
               <form action={deleteUserAction}>
                 <input type="hidden" name="userId" value={user.id} />
-                <button type="submit" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive" aria-label={`Delete ${user.email}`}>
+                <button type="submit" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-destructive" aria-label={`Delete ${user.email}`}>
                   <Trash2 className="size-3.5" />
                 </button>
               </form>
@@ -71,9 +71,9 @@ export function UserCard({
       </div>
 
       {locked ? (
-        <p className="mt-2 text-[11px] text-muted-foreground">Admin: full access to all projects.</p>
+        <p className="mt-2 text-xs text-text-tertiary">Admin: full access to all projects.</p>
       ) : isAdmin ? (
-        <p className="mt-2 text-[11px] text-muted-foreground">Admin: full access to all projects.</p>
+        <p className="mt-2 text-xs text-text-tertiary">Admin: full access to all projects.</p>
       ) : (
         <form id={`access-${user.id}`} action={saveAccessAction} className="mt-3 flex flex-col gap-1.5">
           <input type="hidden" name="userId" value={user.id} />
@@ -82,28 +82,30 @@ export function UserCard({
           ))}
           <input type="hidden" name="limit" value={draftLimit.trim()} />
           {Object.entries(draft).map(([project, level]) => (
-            <div key={project} className="flex items-center justify-between gap-3 rounded-lg bg-secondary/50 px-2.5 py-1.5">
-              <span className="text-xs">{project}</span>
-              <div className="flex items-center gap-1">
-                {(["ask", "write"] as const).map((l) => (
-                  <button
-                    key={l}
-                    type="button"
-                    aria-pressed={level === l}
-                    onClick={() => setDraft((d) => ({ ...d, [project]: l }))}
-                    className={cn(
-                      "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide transition-colors",
-                      level === l ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
-                    )}
-                    title={l === "ask" ? "Questions only" : "Can open pull requests"}
-                  >
-                    {l}
-                  </button>
-                ))}
+            <div key={project} className="flex items-center justify-between gap-3 rounded-md bg-surface-2/50 px-2.5 py-1.5">
+              <span className="truncate text-xs">{project}</span>
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="flex items-center gap-0.5 rounded-md bg-background/40 p-0.5">
+                  {(["ask", "write"] as const).map((l) => (
+                    <button
+                      key={l}
+                      type="button"
+                      aria-pressed={level === l}
+                      onClick={() => setDraft((d) => ({ ...d, [project]: l }))}
+                      className={cn(
+                        "rounded-sm px-2 py-0.5 text-2xs transition-colors",
+                        level === l ? "bg-surface-3 text-foreground" : "text-text-tertiary hover:text-foreground"
+                      )}
+                      title={l === "ask" ? "Questions only" : "Can open pull requests"}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </span>
                 <button
                   type="button"
                   onClick={() => setDraft((d) => { const { [project]: _, ...rest } = d; return rest; })}
-                  className="ml-1 text-muted-foreground transition-colors hover:text-destructive"
+                  className="ml-0.5 rounded-sm px-1 text-muted-foreground transition-colors hover:text-destructive"
                   aria-label={`Remove ${project}`}
                 >
                   ×
@@ -115,7 +117,7 @@ export function UserCard({
             <select
               value=""
               onChange={(e) => e.target.value && setDraft((d) => ({ ...d, [e.target.value]: "ask" }))}
-              className="h-7 self-start rounded-md border border-border bg-card px-2 text-xs text-muted-foreground outline-none"
+              className="h-7 self-start rounded-md border bg-card px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring"
               aria-label="Add project"
             >
               <option value="">Add project</option>
@@ -125,7 +127,7 @@ export function UserCard({
             </select>
           )}
           <label className="flex items-center gap-2 pt-1" title={limitInvalid ? "daily limit must be 1 to 1000" : undefined}>
-            <span className={cn("text-[10px] uppercase tracking-wide", limitInvalid ? "text-destructive" : "text-muted-foreground")}>daily limit</span>
+            <span className={cn("text-2xs tracking-[0.06em] uppercase", limitInvalid ? "text-destructive" : "text-text-tertiary")}>daily limit</span>
             <input
               type="number"
               min={1}
@@ -133,28 +135,28 @@ export function UserCard({
               value={draftLimit}
               onChange={(e) => setDraftLimit(e.target.value)}
               placeholder={String(defaultLimit)}
-              className="h-6 w-14 rounded-md border border-border bg-card px-1 text-center text-[11px] outline-none focus:border-primary/60"
+              className="h-6 w-14 rounded-sm border bg-card px-1 text-center text-xs outline-none focus-visible:border-ring"
             />
-            <span className="text-[10px] text-muted-foreground">requests / day, blank = {defaultLimit}</span>
+            <span className="text-2xs text-text-tertiary">requests / day, blank = {defaultLimit}</span>
           </label>
           {Object.keys(draft).length === 0 && allProjects.length === 0 && (
-            <p className="text-[11px] text-muted-foreground">No projects configured.</p>
+            <p className="text-xs text-text-tertiary">No projects configured.</p>
           )}
           <div className="flex items-center gap-2 pt-1">
             <button
               type="submit"
               disabled={!dirty || pending}
-              className="rounded-full bg-foreground px-3 py-1 text-[10px] uppercase tracking-wide text-background transition-opacity disabled:opacity-30"
+              className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-40"
             >
-              {pending ? "saving…" : "save"}
+              {pending ? "Saving…" : "Save"}
             </button>
             <button
               type="button"
               onClick={() => { setDraft(initial); setDraftLimit(limitStored); }}
               disabled={!dirty || pending}
-              className="rounded-full border border-border px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+              className="rounded-md border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-40"
             >
-              reset
+              Reset
             </button>
           </div>
         </form>

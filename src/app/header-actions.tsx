@@ -20,7 +20,7 @@ export function HeaderActions() {
   }
 
   return (
-    <Button variant="ghost" size="sm" type="button" onClick={signOut} disabled={busy} className="px-2 text-xs text-foreground/80 hover:bg-foreground/5" aria-label="Sign out">
+    <Button variant="ghost" size="sm" type="button" onClick={signOut} disabled={busy} className="px-2 text-xs text-muted-foreground hover:text-foreground" aria-label="Sign out">
       <LogOut />
       <span className="hidden sm:inline">{busy ? "Signing out" : "Sign out"}</span>
     </Button>

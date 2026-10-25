@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { MessageSquarePlus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { HeaderActions } from "@/app/header-actions";
 import { MobileThreads } from "@/components/mobile-threads";
+import { Wordmark } from "@/components/wordmark";
+import { EmptyState } from "@/components/empty-state";
 import { ComposerControls } from "@/components/composer-controls";
 import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
 import { projectConfig } from "@/lib/projects";
@@ -168,55 +170,75 @@ export function SessionView({ initial }: { initial: State }) {
       <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <MobileThreads />
-          <Link href="/" className="text-2xl italic tracking-[-0.07em]" style={{ fontFamily: "var(--font-display)" }}>ijra</Link>
+          <Link href="/" aria-label="ijra home" className="rounded-sm">
+            <Wordmark />
+          </Link>
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
           <Link
             href={`https://github.com/${projectConfig(state.session.project).repo}`}
             target="_blank"
             rel="noreferrer"
-            className="max-w-[28vw] truncate rounded-full border border-foreground/15 px-2.5 py-0.5 text-[10px] tracking-wide text-muted-foreground transition-colors hover:text-foreground"
+            className="max-w-[28vw] truncate rounded-md border border-border px-2 py-0.5 text-2xs text-text-secondary transition-colors hover:text-foreground"
           >
             {state.session.project}
           </Link>
           {state.session.owner_id && state.session.owner_id !== state.viewerId && state.ownerEmail && (
-            <span className="hidden truncate text-[10px] text-muted-foreground sm:inline" title="Session owner">{state.ownerEmail}</span>
+            <span className="hidden truncate text-2xs text-text-tertiary sm:inline" title="Session owner">{state.ownerEmail}</span>
           )}
-          <Button onClick={deleteThread} variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete thread">
+          <Button onClick={deleteThread} variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive" aria-label="Delete thread">
             <Trash2 className="size-3.5" />
           </Button>
           <HeaderActions />
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-4 sm:px-10">
+      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 sm:px-6">
         {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto py-5 sm:gap-6 sm:py-12">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 sm:gap-7 sm:py-10">
           {state.messages.length === 0 && (
-            <div className="flex flex-1 flex-col justify-center">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-primary">New request</p>
-              <h1 className="mt-3 text-2xl tracking-[-0.04em]">Describe the change.</h1>
-              <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">{initial.canWrite ? "The agent will make the change and open a pull request." : "Ask questions about this repository. Changes need a project grant."}</p>
-            </div>
+            <EmptyState
+              icon={MessageSquarePlus}
+              title="Describe the change."
+              description={initial.canWrite ? "The agent works in the repo and opens a pull request for review." : "Ask questions about this repository. Changes need a project grant."}
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  {["Fix a failing test", "Explain this folder", "Update a dependency"].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => {
+                        setInput(suggestion);
+                        document.getElementById("composer-input")?.focus();
+                      }}
+                      className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              }
+              className="flex-1 justify-center py-8"
+            />
           )}
-          {state.messages.map((m) => <Message key={m.id} role={m.role} content={m.content} meta={m.meta} />)}
+          {state.messages.map((m, index) => <Message key={m.id} index={index} role={m.role} content={m.content} meta={m.meta} />)}
           {anyActive && (
             <div role="status">
               <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />
             </div>
           )}
           {anyActive && pollFailing && (
-            <p role="status" className="text-[10px] text-muted-foreground">Live updates are failing. The run continues on GitHub.</p>
+            <p role="status" className="text-2xs text-text-tertiary">Live updates are failing. The run continues on GitHub.</p>
           )}
           {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
-            <div role="log" aria-label="Live agent output" className="animate-fade-up flex flex-col gap-2 rounded-xl border bg-card/60 p-3">
+            <div role="log" aria-label="Live agent output" className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-surface-1/60 p-3">
               {live.tools.length > 0 && (
-                <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+                <div className="flex flex-col gap-0.5 font-mono text-2xs text-text-tertiary">
                   {live.tools.map((tool, index) => <span key={`${index}-${tool}`} className="truncate">› {tool}</span>)}
                 </div>
               )}
               {live.text.length > 0 && (
-                <p className="max-h-40 overflow-y-auto whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">{live.text}</p>
+                <p className="max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">{live.text}</p>
               )}
             </div>
           )}
@@ -224,22 +246,23 @@ export function SessionView({ initial }: { initial: State }) {
           <div ref={bottomRef} />
         </div>
 
-        <div className="shrink-0 pb-4 pt-2 sm:pb-5">
+        <div className="shrink-0 pt-2 pb-4 sm:pb-5">
           {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
-          <div className="rounded-xl border bg-card p-2.5 focus-within:border-primary/60 sm:p-3">
+          <div className="rounded-xl border bg-card p-2.5 shadow-card sm:p-3">
             <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
-            <Textarea value={input} onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
+            <Textarea value={input} id="composer-input" onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
             }} onPaste={(e) => {
               const files = [...e.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
               if (files.length > 0 && modelSupportsImages) { e.preventDefault(); imageQueue.add(files); }
-            }} placeholder="Ask a question or describe a change" rows={2} aria-label="Message to ijra" className="min-h-10 w-full resize-none border-0 bg-transparent px-1.5 py-1 text-sm shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5 dark:bg-transparent" />
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2.5 text-[10px] text-muted-foreground">
+            }} placeholder="Ask a question or describe a change" rows={2} aria-label="Message to ijra" className="min-h-10 w-full resize-none border-0 bg-transparent px-1.5 py-1 text-base leading-6 shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5" />
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2.5 text-2xs text-text-tertiary">
               {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={sending || imageQueue.images.length >= 3} />}
-              <span className="hidden sm:inline">Enter to send</span>
+              <span className={cn("hidden transition-opacity duration-150 sm:inline", input ? "opacity-0" : "opacity-100")}>Enter to send</span>
               <Quota refreshKey={state.runs.length} />
-              <span className="ml-auto">
+              <span className="ml-auto max-[380px]:ml-0 max-[380px]:w-full">
                 <ComposerControls
+                  className="max-[380px]:w-full"
                   model={model}
                   models={state.models}
                   onModel={setModel}
@@ -271,7 +294,7 @@ function Quota({ refreshKey }: { refreshKey?: number }) {
   return <span>{quota.used}/{quota.limit} used today</span>;
 }
 
-function Message({ role, content, meta }: { role: string; content: string; meta?: string | null }) {
+function Message({ role, content, meta, index }: { role: string; content: string; meta?: string | null; index: number }) {
   const isUser = role === "user";
   let imageIds: string[] = [];
   try {
@@ -280,8 +303,8 @@ function Message({ role, content, meta }: { role: string; content: string; meta?
   } catch {
   }
   return (
-    <article className="animate-fade-up border-l border-border pl-3 sm:pl-4">
-      <p className={cn("mb-2 text-[10px] uppercase tracking-[0.14em]", isUser ? "text-primary" : "text-muted-foreground")}>{isUser ? "You" : "ijra"}</p>
+    <article className="animate-fade-up border-l border-border pl-4" style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
+      <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
       {isUser ? (
         <>
           {imageIds.length > 0 && (
@@ -289,7 +312,7 @@ function Message({ role, content, meta }: { role: string; content: string; meta?
               {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
             </div>
           )}
-          <div className="max-w-3xl break-words whitespace-pre-wrap text-sm leading-6">{content}</div>
+          <div className="max-w-[65ch] text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
         </>
       ) : (
         <Markdown text={content} />
@@ -300,7 +323,7 @@ function Message({ role, content, meta }: { role: string; content: string; meta?
 
 function Markdown({ text }: { text: string }) {
   return (
-    <div className="max-w-3xl break-words space-y-3 text-sm leading-6 [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_code]:rounded-sm [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[12px] [&_h1,h2,h3]:text-base [&_h1,h2,h3]:font-semibold [&_li]:ml-4 [&_ol]:list-decimal [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-secondary [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-semibold [&_ul]:list-disc">
+    <div className="max-w-[65ch] space-y-3 text-base leading-6 break-words [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_code]:rounded-sm [&_code]:bg-surface-2 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_h1,h2,h3]:text-lg [&_h1,h2,h3]:font-medium [&_h1,h2,h3]:tracking-[-0.01em] [&_li]:ml-4 [&_ol]:list-decimal [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:bg-surface-1 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-medium [&_ul]:list-disc">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
     </div>
   );
@@ -316,7 +339,7 @@ function StatusLine({ runs, onCancel, stage }: { runs: RunRow[]; onCancel: () =>
     <div className="animate-fade-up flex items-center gap-2 text-xs text-primary">
       <span className="size-1.5 animate-pulse rounded-full bg-primary" />
       {label}
-      <button onClick={onCancel} className="ml-1 text-muted-foreground underline underline-offset-4 hover:text-foreground">
+      <button onClick={onCancel} className="ml-1 text-text-tertiary underline underline-offset-4 transition-colors hover:text-foreground">
         cancel
       </button>
     </div>
@@ -345,25 +368,25 @@ function PrCard({ run }: { run: RunRow | undefined }) {
     : run.status;
   const tone =
     run.status === "awaiting_review" ? "text-primary"
-    : run.status === "merged" ? "text-[#71c98e]"
-    : "text-muted-foreground";
+    : run.status === "merged" ? "text-primary"
+    : "text-text-tertiary";
 
   let reasons: string[] = [];
   try { reasons = run.policy_reasons ? JSON.parse(run.policy_reasons) : []; } catch {}
 
   return (
-    <div className="animate-fade-up flex flex-col gap-2 rounded-xl border bg-card px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
+    <div className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-card px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
-        <Badge variant="outline" className={cn("shrink-0 border-foreground/15 text-[10px] uppercase tracking-wide", tone)}>{label}</Badge>
+        <Badge variant="outline" className={cn("shrink-0 text-2xs", tone)}>{label}</Badge>
         {run.pr_url && (
           <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
             {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
           </a>
         )}
-        {run.branch && <span className="hidden shrink-0 text-[10px] text-muted-foreground sm:inline">{run.branch}</span>}
+        {run.branch && <span className="hidden shrink-0 font-mono text-2xs text-text-tertiary sm:inline">{run.branch}</span>}
       </div>
       {reasons.length > 0 && (
-        <span className="text-[10px] text-muted-foreground sm:ml-auto" title={reasons[0]}>{shortReason(reasons[0])}</span>
+        <span className="text-2xs text-text-tertiary sm:ml-auto" title={reasons[0]}>{shortReason(reasons[0])}</span>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/empty-state";
 import { useSessions } from "@/components/sessions-context";
 import { cn } from "@/lib/utils";
 
@@ -44,22 +45,40 @@ export function MobileThreads() {
 
   return (
     <div className="md:hidden">
-      <button ref={openerRef} onClick={() => setOpen(true)} className="rounded-md px-2 py-1 text-[10px] text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Open threads">
+      <button ref={openerRef} onClick={() => setOpen(true)} className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground" aria-label="Open threads">
         <Menu className="size-4" />
       </button>
       {open && (
         <div className="fixed inset-0 z-50" onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
           <button className="absolute inset-0 bg-background/75 backdrop-blur-sm" onClick={() => setOpen(false)} aria-label="Close threads" tabIndex={-1} />
-          <aside role="dialog" aria-modal="true" aria-label="Threads" onKeyDown={trapTab} className="relative flex h-full w-[min(19rem,86vw)] flex-col border-r bg-background shadow-2xl">
-            <div className="flex h-14 items-center justify-between border-b px-4">
-              <span className="text-xs text-muted-foreground">Threads</span>
+          <aside role="dialog" aria-modal="true" aria-label="Threads" onKeyDown={trapTab} className="relative flex h-full w-[min(19rem,86vw)] flex-col border-r bg-background shadow-overlay">
+            <div className="flex h-14 items-center justify-between px-4">
+              <span className="type-label text-text-tertiary">Threads</span>
               <div className="flex items-center gap-1">
-                <Link href="/" onClick={() => setOpen(false)} className="rounded-md p-2 text-primary hover:bg-secondary" aria-label="New thread"><MessageSquarePlus className="size-4" /></Link>
-                <button ref={closeRef} onClick={() => setOpen(false)} className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label="Close threads"><X className="size-4" /></button>
+                <Link href="/" onClick={() => setOpen(false)} className="rounded-md p-2 text-primary transition-colors hover:bg-surface-2" aria-label="New thread"><MessageSquarePlus className="size-4" /></Link>
+                <button ref={closeRef} onClick={() => setOpen(false)} className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground" aria-label="Close threads"><X className="size-4" /></button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {sessions.length === 0 ? <p className="px-2 py-3 text-xs leading-5 text-muted-foreground">Your requests will appear here.</p> : <ul>{sessions.map((session) => <li key={session.id}><Link href={`/s/${session.id}`} onClick={() => setOpen(false)} className={cn("block rounded-lg px-2 py-2.5 hover:bg-secondary", pathname === `/s/${session.id}` && "bg-secondary")}><div className="truncate text-xs">{session.title || "Untitled request"}</div><div className="mt-1 flex items-center justify-between gap-2"><span className="truncate text-[10px] text-muted-foreground">{session.project}</span><Badge variant="outline" className="h-4 border-foreground/15 px-1 text-[9px] text-muted-foreground">{label(session.last_status)}</Badge></div></Link></li>)}</ul>}
+            <div className="flex-1 overflow-y-auto px-2 py-1">
+              {sessions.length === 0 ? <EmptyState variant="inline" title="No threads yet" description="Your requests will appear here." /> : (
+                <ul className="flex flex-col gap-0.5">
+                  {sessions.map((session) => (
+                    <li key={session.id}>
+                      <Link
+                        href={`/s/${session.id}`}
+                        onClick={() => setOpen(false)}
+                        className={cn("block rounded-md px-2.5 py-2 transition-colors hover:bg-surface-2", pathname === `/s/${session.id}` && "bg-surface-2")}
+                      >
+                        <div className="truncate text-sm">{session.title || "Untitled request"}</div>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <span className="truncate text-2xs text-text-tertiary">{session.project}</span>
+                          <Badge variant="outline" className="h-4 border-border px-1 text-2xs text-text-tertiary">{label(session.last_status)}</Badge>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </aside>
         </div>

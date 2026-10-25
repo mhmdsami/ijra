@@ -12,15 +12,15 @@ const tabs = [
 export function AdminNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex items-center gap-0.5 rounded-full border border-border p-0.5">
+    <nav className="flex items-center gap-0.5 rounded-lg border bg-surface-1 p-0.5">
       {tabs.map((tab) => (
         <Link
           key={tab.href}
           href={tab.href}
           aria-current={pathname === tab.href ? "page" : undefined}
           className={cn(
-            "rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide transition-colors",
-            pathname === tab.href ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+            "rounded-md px-2.5 py-1 text-2xs font-medium tracking-[0.06em] uppercase transition-colors",
+            pathname === tab.href ? "bg-foreground text-background" : "text-text-tertiary hover:text-foreground"
           )}
         >
           {tab.label}

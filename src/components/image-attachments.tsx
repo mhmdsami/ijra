@@ -84,11 +84,11 @@ export function AttachmentTray({ images, onRemove }: { images: PendingImage[]; o
     <div className="flex flex-wrap gap-2 pb-2">
       {images.map((image) => (
         <span key={image.key} className="group relative">
-          <img src={`data:${image.mime};base64,${image.data}`} alt="" className="size-14 rounded-lg border object-cover" />
+          <img src={`data:${image.mime};base64,${image.data}`} alt="" className="size-14 rounded-md border object-cover" />
           <button
             type="button"
             onClick={() => onRemove(image.key)}
-            className="absolute -right-1.5 -top-1.5 rounded-full border bg-card p-0.5 text-muted-foreground hover:text-destructive"
+            className="absolute -top-1.5 -right-1.5 rounded-sm border bg-card p-0.5 text-muted-foreground transition-colors hover:text-destructive"
             aria-label="Remove image"
           >
             <X className="size-3" />
@@ -118,7 +118,7 @@ export function AttachButton({ onFiles, disabled }: { onFiles: (files: File[]) =
         type="button"
         onClick={() => input.current?.click()}
         disabled={disabled}
-        className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
+        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-40"
         aria-label="Attach images"
       >
         <ImagePlus className="size-4" />

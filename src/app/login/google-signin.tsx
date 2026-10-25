@@ -14,20 +14,23 @@ export function GoogleSignIn() {
   }
 
   return (
-    <div className="flex h-dvh items-center justify-center">
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center pt-10 text-center">
-          <CardTitle className="text-4xl italic tracking-[-0.06em]" style={{ fontFamily: "var(--font-display)" }}>ijra</CardTitle>
+    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(60%_100%_at_50%_0%,color-mix(in_oklch,var(--primary)_12%,transparent),transparent)]"
+      />
+      <Card className="relative w-full max-w-sm shadow-card">
+        <CardHeader className="items-center gap-2 pt-9 text-center">
+          <CardTitle className="type-display text-4xl leading-[1.02]">ijra</CardTitle>
           <CardDescription>Small fixes, run for you.</CardDescription>
         </CardHeader>
-        <CardContent className="pb-10">
-          <div className="flex justify-center">
-            <Button onClick={signIn} disabled={busy} className="px-5" variant="outline">
+        <CardContent className="pb-9">
+          <Button onClick={signIn} disabled={busy} className="w-full" variant="outline">
             {busy ? (
               "Redirecting…"
             ) : (
               <>
-                <svg viewBox="0 0 24 24" className="size-4">
+                <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
                   <path
                     fill="#4285F4"
                     d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.3h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.2-2.1 3.7-5.1 3.7-8.8z"
@@ -48,8 +51,7 @@ export function GoogleSignIn() {
                 Continue with Google
               </>
             )}
-            </Button>
-          </div>
+          </Button>
         </CardContent>
       </Card>
     </div>

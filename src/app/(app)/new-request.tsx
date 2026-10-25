@@ -53,8 +53,12 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
   }
 
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-[0_20px_60px_-35px_rgb(0_0_0_/_0.9)]">
-      {error && <p role="alert" className="mb-3 rounded-lg border border-destructive/40 px-3 py-2 text-xs text-destructive">{error}</p>}
+    <div className="rounded-xl border bg-card p-3 shadow-card sm:p-4">
+      {error && (
+        <p role="alert" className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {error}
+        </p>
+      )}
       <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
       <Textarea
         value={content}
@@ -68,19 +72,25 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
         }}
         placeholder="Tell ijra what to fix"
         rows={3}
-        className="min-h-20 resize-none border-0 bg-transparent px-0 py-0 text-sm leading-6 shadow-none focus-visible:ring-0 dark:bg-transparent"
+        className="min-h-20 resize-none border-0 bg-transparent px-0 py-0 text-base leading-6 shadow-none focus-visible:ring-0"
       />
-      <div className="mt-3 flex flex-col gap-2 border-t pt-3 sm:flex-row sm:items-center sm:gap-3">
-        <div className="flex min-w-0 items-center gap-1 sm:flex-1">
+      <div className="mt-3 flex items-center gap-3 border-t pt-3 max-[380px]:flex-col max-[380px]:items-stretch max-[380px]:gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
           {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={busy || imageQueue.images.length >= 3} />}
           <label className="sr-only" htmlFor="project">Project</label>
-          <select id="project" value={project} onChange={(event) => setProject(event.target.value)} className="min-w-0 flex-1 appearance-none truncate bg-transparent text-xs text-muted-foreground outline-none sm:max-w-[40%] sm:flex-none">
+          <select
+            id="project"
+            value={project}
+            onChange={(event) => setProject(event.target.value)}
+            className="min-w-0 flex-1 truncate bg-transparent text-xs text-muted-foreground outline-none transition-colors appearance-none hover:text-foreground sm:max-w-[40%] sm:flex-none"
+          >
             <option value="" disabled>Choose a project</option>
             {projects.map((id) => <option key={id} value={id}>{id}</option>)}
           </select>
         </div>
-        <div className="flex shrink-0 justify-end sm:justify-start">
+        <div className="flex shrink-0 justify-end max-[380px]:w-full">
           <ComposerControls
+            className="max-[380px]:w-full"
             model={model}
             models={models}
             onModel={setModel}

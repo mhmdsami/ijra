@@ -38,10 +38,10 @@ export function ModelRow({
   }
 
   return (
-    <div className={cn("flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2", pending && "opacity-50")}>
+    <div className={cn("flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5", pending && "opacity-50")}>
       <div className="min-w-0">
-        <div className="truncate text-xs text-foreground">{model.label}</div>
-        <div className="truncate text-[10px] text-muted-foreground">
+        <div className="truncate text-sm text-foreground">{model.label}</div>
+        <div className="truncate font-mono text-2xs text-text-tertiary">
           {model.id}
           {model.vision && " · images"}
           {model.isDefault && " · default"}
@@ -57,7 +57,7 @@ export function ModelRow({
               type="button"
               disabled={model.isDefault || model.unavailable || stale || pending}
               onClick={() => run(setDefaultModelAction, { id: model.id })}
-              className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+              className="rounded-md border px-2 py-1 text-2xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-30"
             >
               {model.isDefault ? "default" : "make default"}
             </button>
@@ -65,7 +65,7 @@ export function ModelRow({
               type="button"
               disabled={pending}
               onClick={() => run(removeModelAction, { id: model.id })}
-              className="rounded-full border border-border px-2.5 py-1 text-[10px] uppercase tracking-wide text-muted-foreground transition-colors hover:text-destructive disabled:opacity-30"
+              className="rounded-md border px-2 py-1 text-2xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-destructive disabled:opacity-30"
             >
               remove
             </button>
@@ -75,7 +75,7 @@ export function ModelRow({
             type="button"
             disabled={model.unavailable || stale || pending}
             onClick={() => run(addModelAction, { id: model.id })}
-            className="rounded-full bg-foreground px-3 py-1 text-[10px] uppercase tracking-wide text-background disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-md bg-primary px-2.5 py-1 text-2xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-40"
           >
             {model.unavailable || stale ? "unavailable" : "enable"}
           </button>
