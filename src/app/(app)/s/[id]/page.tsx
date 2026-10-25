@@ -17,14 +17,16 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     getDefaultModel(),
   ]);
   const models = modelRows.map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1 }));
+  const visibleRuns = user.isAdmin ? runs : runs.map((run) => ({ ...run, error_detail: null }));
   return (
     <SessionView
       key={session.id}
       initial={{
         session,
         messages,
-        runs,
+        runs: visibleRuns,
         ownerEmail,
+        isAdmin: user.isAdmin,
         viewerId: user.id,
         canWrite: canWriteProject(user, session.project),
         models,

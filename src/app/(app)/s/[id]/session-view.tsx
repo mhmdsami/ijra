@@ -15,18 +15,21 @@ import { Wordmark } from "@/components/wordmark";
 import { EmptyState } from "@/components/empty-state";
 import { ComposerControls } from "@/components/composer-controls";
 import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
+import { useSessions } from "@/components/sessions-context";
 import { projectConfig } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
 import type { StreamEvent } from "@/lib/types";
 
-type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; models: { id: string; label: string; vision: boolean }[]; defaultModel: string };
+type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; isAdmin: boolean; models: { id: string; label: string; vision: boolean }[]; defaultModel: string };
 const ACTIVE = new Set(["dispatching", "running"]);
 
 export function SessionView({ initial }: { initial: State }) {
   const [state, setState] = useState(initial);
   const [input, setInput] = useState("");
-    const [model, setModel] = useState<string>(initial.defaultModel);
+  const lastRunModel = [...initial.runs].reverse().find((run) => run.model)?.model;
+  const startingModel = lastRunModel && initial.models.some((m) => m.id === lastRunModel) ? lastRunModel : initial.defaultModel;
+  const [model, setModel] = useState<string>(startingModel);
   const [sending, setSending] = useState(false);
   const imageQueue = useImageQueue();
   const modelSupportsImages = state.models.find((m) => m.id === model)?.vision ?? false;
@@ -34,10 +37,15 @@ export function SessionView({ initial }: { initial: State }) {
   const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({ text: "", tools: [], stage: "" });
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { sessions } = useSessions();
+  const refreshedSidebar = useRef(false);
   const anyActive = state.runs.some((r) => ACTIVE.has(r.status));
   const activeRun = state.runs.find((r) => ACTIVE.has(r.status));
   const dispatchAt = activeRun?.dispatch_at ?? 0;
   const latestRun = [...state.runs].reverse().find((r) => !ACTIVE.has(r.status) && (r.pr_url || r.status === "blocked"));
+  const lastRun = state.runs.at(-1);
+  const hasAgentMessage = state.messages.some((m) => m.role === "agent");
+  const silentRun = !!lastRun && !hasAgentMessage && (lastRun.status === "answered" || lastRun.status === "no_changes");
 
   const [pollFailing, setPollFailing] = useState(false);
   const poll = useCallback(async () => {
@@ -51,6 +59,14 @@ export function SessionView({ initial }: { initial: State }) {
       setPollFailing(true);
     }
   }, [initial.session.id]);
+
+  useEffect(() => {
+    if (refreshedSidebar.current) return;
+    if (!sessions.some((s) => s.id === initial.session.id)) {
+      refreshedSidebar.current = true;
+      router.refresh();
+    }
+  }, [sessions, initial.session.id, router]);
 
   useEffect(() => {
     if (!anyActive) {
@@ -120,7 +136,7 @@ export function SessionView({ initial }: { initial: State }) {
     setState((s) => ({
       ...s,
       messages: [...s.messages, { id: -Date.now(), session_id: s.session.id, role: "user", content, meta: null, created_at: Date.now() }],
-      runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, policy_status: "pending", policy_reasons: null, decision: null, decided_by: null, decided_at: null, decision_reason: null }],
+      runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, policy_status: "pending", policy_reasons: null, decision: null, decided_by: null, decided_at: null, decision_reason: null, error_detail: null }],
     }));
     try {
       const imageIds = imageQueue.images.length > 0 ? await uploadImages(initial.session.id, imageQueue.images) : [];
@@ -248,6 +264,23 @@ export function SessionView({ initial }: { initial: State }) {
 
         <div className="shrink-0 pt-2 pb-4 sm:pb-5">
           {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
+          {(silentRun || lastRun?.status === "failed") && (
+            <div className="mb-2 space-y-1.5">
+              <p role="status" className="text-xs text-destructive">
+                {lastRun?.status === "failed" ? "The run failed." : "The run finished without a reply."}
+                {lastRun?.status === "failed" && !initial.isAdmin ? " Ask an admin to check the run logs." : ""}
+                {lastRun?.gh_run_url && (
+                  <> <a href={lastRun.gh_run_url} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:text-foreground">Open the run logs</a></>
+                )}
+              </p>
+              {initial.isAdmin && lastRun?.error_detail && (
+                <details className="rounded-md border bg-card px-3 py-2">
+                  <summary className="cursor-pointer text-2xs text-text-tertiary">Error details</summary>
+                  <pre className="mt-2 max-h-48 overflow-auto font-mono text-2xs whitespace-pre-wrap break-words text-destructive">{lastRun.error_detail}</pre>
+                </details>
+              )}
+            </div>
+          )}
           <div className="rounded-xl border bg-card p-2.5 shadow-card sm:p-3">
             <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
             <Textarea value={input} id="composer-input" onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {

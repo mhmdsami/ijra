@@ -211,6 +211,7 @@ function runPi(cmd, options) {
     let finalMessage = "";
     let stderr = "";
     let toolCalls = 0;
+    let errorMessage = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
       buffer += chunk;
@@ -232,6 +233,7 @@ function runPi(cmd, options) {
           continue;
         }
         if (event?.type === "message_end" && event.message?.role === "assistant") {
+          if (event.message.stopReason === "error" && event.message.errorMessage) errorMessage = event.message.errorMessage;
           const text = (event.message.content ?? [])
             .filter((part) => part?.type === "text")
             .map((part) => part.text)
@@ -251,7 +253,7 @@ function runPi(cmd, options) {
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
-    child.on("close", (code) => resolve({ code: code ?? 1, text: (finalMessage || streamed).trim(), stderr, toolCalls }));
+    child.on("close", (code) => resolve({ code: code ?? 1, text: (finalMessage || streamed).trim(), stderr, toolCalls, error: errorMessage }));
   });
 }
 
@@ -322,7 +324,8 @@ if (!cfg) die(`Unknown project "${PROJECT}". Known: ${Object.keys(registry).join
 if (cfg.enabled === false) die(`Project "${PROJECT}" is not enabled yet`);
 
 const session = SESSION || `ts${Date.now().toString(36)}`;
-const model = MODEL || cfg.defaultModel;
+const model = MODEL;
+if (!model) die("MODEL is empty");
 if (MODE !== "fix" && MODE !== "ask" && MODE !== "auto") die(`Unknown mode "${MODE}"`);
 const artifacts = resolve(here, "../artifacts");
 mkdirSync(artifacts, { recursive: true });
@@ -418,11 +421,13 @@ try {
     `pi -p --mode json --provider opencode-go --model ${model} ${skillArgs} ${sessionArgs} < ${shq(requestPath)}`,
     { env: piEnv }
   );
+  if (pi.error) die(pi.error.slice(0, 500));
   if (pi.code !== 0) {
     const detail = pi.text || pi.stderr.trim();
     die(`pi exited ${pi.code}${detail ? `: ${detail.slice(0, 500)}` : ""}`);
   }
   const agentSummary = pi.text.slice(0, 4000);
+  if (!agentSummary.trim()) die("The agent returned no response.");
   outcome.agentSummary = agentSummary;
   outcome.toolCalls = pi.toolCalls;
 
@@ -555,7 +560,8 @@ try {
   if (e instanceof RunError) {
     console.error(`\nrunner: ${e.message}`);
     outcome.status = "failed";
-    outcome.agentSummary = [outcome.agentSummary, `Run failed: ${e.message}`].filter(Boolean).join("\n\n");
+    outcome.error = e.message;
+    outcome.agentSummary = "The run failed before it could reply.";
     await finish(1);
   }
   throw e;

@@ -45,6 +45,7 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
         return;
       }
       router.push(`/s/${id}`);
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : "Could not send the request. Check your connection and try again.");
     } finally {

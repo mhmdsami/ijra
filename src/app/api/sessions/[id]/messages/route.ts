@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { requireSameOrigin } from "@/lib/csrf";
 import {
   DEFAULT_DAILY_LIMIT,
@@ -91,12 +92,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
   }
 
+  const dispatch = async () => {
+    try {
+      await startRun({ project: session.project, request, session: id, model: runModel, mode, runId, imageUrls });
+    } catch (e) {
+      await updateRun(runId, { status: "failed" });
+      await appendAuditEvent({ sessionId: id, runId, actorId: user.id, action: "run.dispatch_failed", metadata: { error: e instanceof Error ? e.message : String(e) } });
+    }
+  };
+
   try {
-    await startRun({ project: session.project, request, session: id, model: runModel, mode, runId, imageUrls });
-  } catch (e) {
-    await updateRun(runId, { status: "failed" });
-    await appendAuditEvent({ sessionId: id, runId, actorId: user.id, action: "run.dispatch_failed", metadata: { error: e instanceof Error ? e.message : String(e) } });
-    return NextResponse.json({ error: "dispatch failed" }, { status: 502 });
+    getCloudflareContext().ctx.waitUntil(dispatch());
+  } catch {
+    await dispatch();
   }
 
   return NextResponse.json({ messages: await getMessages(id), runs: await getRuns(id) });

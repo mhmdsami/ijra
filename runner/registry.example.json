@@ -20,7 +20,6 @@
     "safePaths": [
       "src/**",
       "public/**"
-    ],
-    "defaultModel": "deepseek-flash"
+    ]
   }
 }

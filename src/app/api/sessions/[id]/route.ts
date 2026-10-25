@@ -34,10 +34,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (agentMessage) await addMessage(id, "agent", agentMessage);
 
+  const finalRuns = await getRuns(id);
   return NextResponse.json({
     session,
     messages: await getMessages(id),
-    runs: await getRuns(id),
+    runs: user.isAdmin ? finalRuns : finalRuns.map((run) => ({ ...run, error_detail: null })),
   });
 }
 

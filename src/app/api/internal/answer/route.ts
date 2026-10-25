@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   if (!(await validSignature(body, req.headers.get("x-ijra-timestamp") ?? "", req.headers.get("x-ijra-signature") ?? ""))) {
     return NextResponse.json({ error: "invalid runner signature" }, { status: 401 });
   }
-  const payload = parseJson(body) as { runId?: string; status?: string; summary?: string; outcome?: { prUrl?: string; branch?: string; policyReasons?: string[]; title?: string } };
+  const payload = parseJson(body) as { runId?: string; status?: string; summary?: string; outcome?: { prUrl?: string; branch?: string; policyReasons?: string[]; title?: string; error?: string } };
   if (!payload) return NextResponse.json({ error: "invalid body" }, { status: 400 });
   if (!payload.runId || !payload.status) return NextResponse.json({ error: "runId and status are required" }, { status: 400 });
   const fingerprint = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${req.headers.get("x-ijra-timestamp")}.${body}`)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -28,8 +28,10 @@ export async function POST(req: Request) {
   if (!["dispatching", "running", "failed"].includes(run.status)) return NextResponse.json({ error: "invalid run transition" }, { status: 409 });
   const status = ["answered", "no_changes", "awaiting_review", "failed", "blocked"].includes(payload.status) ? payload.status : "failed";
   const summary = payload.summary?.trim();
-  await updateRun(run.id, { status, pr_url: payload.outcome?.prUrl ?? null, branch: payload.outcome?.branch ?? null, agent_msg: summary ? 1 : 0, policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed", policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []) });
-  if (summary) await addMessage(run.session_id, "agent", summary);
+  const errorDetail = status === "failed" ? (payload.outcome?.error?.trim() || summary?.replace(/^Run failed:\s*/, "") || "The run failed before it could reply.").slice(0, 4000) : null;
+  const visibleSummary = status === "failed" ? "The run failed before it could reply." : summary;
+  await updateRun(run.id, { status, pr_url: payload.outcome?.prUrl ?? null, branch: payload.outcome?.branch ?? null, agent_msg: visibleSummary ? 1 : 0, policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed", policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []), error_detail: errorDetail });
+  if (visibleSummary) await addMessage(run.session_id, "agent", visibleSummary);
   await clearProgress(run.id);
   const title = payload.outcome?.title?.trim();
   if (title) await setSessionTitle(run.session_id, title.slice(0, 80));
