@@ -29,6 +29,49 @@ function firstLine(s) {
   return s.trim().split("\n")[0];
 }
 
+function parseNameStatus(output) {
+  const tokens = output.split("\0");
+  const records = [];
+  for (let index = 0; index < tokens.length;) {
+    const status = tokens[index++];
+    if (!status) continue;
+    const first = tokens[index++];
+    if (!first) continue;
+    if (status[0] === "R" || status[0] === "C") {
+      const second = tokens[index++];
+      if (!second) continue;
+      records.push({ status, path: second, origPath: first });
+    } else {
+      records.push({ status, path: first });
+    }
+  }
+  return records;
+}
+
+function parseIndexEntries(output) {
+  const entries = new Map();
+  for (const record of output.split("\0")) {
+    if (!record) continue;
+    const tab = record.indexOf("\t");
+    if (tab === -1) continue;
+    const [mode, sha] = record.slice(0, tab).split(" ");
+    entries.set(record.slice(tab + 1), { mode, sha });
+  }
+  return entries;
+}
+
+function blobContent(sha, cwd) {
+  const result = spawnSync("git", ["cat-file", "blob", sha], { cwd, maxBuffer: 100 * 1024 * 1024 });
+  if (result.status !== 0) die(`Cannot read staged blob ${sha}`);
+  return result.stdout;
+}
+
+function changedLineCount(shortstat) {
+  const added = Number(shortstat.match(/(\d+) insertion/)?.[1] ?? 0);
+  const deleted = Number(shortstat.match(/(\d+) deletion/)?.[1] ?? 0);
+  return added + deleted;
+}
+
 function slug(s) {
   return firstLine(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "request";
 }
@@ -438,11 +481,13 @@ try {
     await finish(0);
   }
 
-  let changes = sh("git status --porcelain", "status").stdout
-    .split("\n")
-    .filter((l) => l.trim())
-    .map((l) => ({ path: l.slice(3).trim().replace(/^"|"$/g, ""), deleted: l.slice(0, 2).includes("D") }));
-  let changed = changes.map((c) => c.path);
+  const generated = ["tsconfig.json", "next-env.d.ts", "tsconfig.tsbuildinfo"];
+  sh("git add -A", "stage", { env: cleanEnv });
+
+  const changes = parseNameStatus(sh("git diff --cached -M --name-status -z", "status").stdout);
+  const index = parseIndexEntries(sh("git ls-files -s -z", "modes").stdout);
+  const changed = changes.map((c) => c.path);
+  const affected = [...new Set(changes.flatMap((c) => c.origPath ? [c.origPath, c.path] : [c.path]))];
   if (changed.length === 0) {
     outcome.status = MODE === "auto" ? "answered" : "no_changes";
     await finish(0);
@@ -450,10 +495,9 @@ try {
   outcome.changedFiles = changed;
   outcome.agentSummary = agentSummary;
   const protectedPath = /(^|\/)(package(-lock)?\.json|bun\.lockb?|pnpm-lock\.yaml|yarn\.lock|\.github\/|migrations?\/|src\/lib\/|src\/app\/api\/|auth)/i;
-  const protectedHits = changed.filter((file) => protectedPath.test(file));
-  const outsideZone = changed.filter((file) => !protectedPath.test(file) && !(cfg.safePaths ?? []).some((pattern) => glob(pattern).test(file)));
-  const lineStats = sh("git diff --numstat", "line-stats", { env: cleanEnv }).stdout.trim().split("\n").filter(Boolean);
-  outcome.changedLines = lineStats.reduce((total, line) => { const [added, deleted] = line.split("\t"); return total + (Number(added) || 0) + (Number(deleted) || 0); }, 0);
+  const protectedHits = affected.filter((file) => protectedPath.test(file));
+  const outsideZone = affected.filter((file) => !protectedPath.test(file) && !(cfg.safePaths ?? []).some((pattern) => glob(pattern).test(file)));
+  outcome.changedLines = changedLineCount(sh("git diff --cached --shortstat", "line-stats", { env: cleanEnv }).stdout);
   if (changed.length > 12) outcome.policyReasons.push(`changed ${changed.length} files; limit is 12`);
   if (outcome.changedLines > 400) outcome.policyReasons.push(`changed ${outcome.changedLines} lines; limit is 400`);
   if (protectedHits.length) outcome.policyReasons.push(`protected path, needs a manual change: ${protectedHits.join(", ")}`);
@@ -474,16 +518,19 @@ try {
     }
   }
 
-  emitProgress("stage", `committing ${changed.length} file(s)`);
-  outcome.safeZone = changed.every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
-
-  const generated = ["tsconfig.json", "next-env.d.ts", "tsconfig.tsbuildinfo"];
-  const drifted = changed.filter((f) => generated.includes(f));
-  if (drifted.length) {
-    sh(`git checkout -- ${drifted.join(" ")}`, { allowFail: true });
-    changed = changed.filter((f) => !drifted.includes(f));
-    outcome.changedFiles = changed;
+  for (const file of generated) {
+    sh(`git restore --source=HEAD --staged --worktree -- ${shq(file)}`, "reset generated", { allowFail: true });
   }
+  const committed = changes.filter((c) => !generated.includes(c.path) && !(c.origPath && generated.includes(c.origPath)));
+  if (committed.length === 0) {
+    outcome.changedFiles = [];
+    outcome.status = MODE === "auto" ? "answered" : "no_changes";
+    await finish(0);
+  }
+  outcome.changedFiles = committed.map((c) => c.path);
+
+  emitProgress("stage", `committing ${committed.length} file(s)`);
+  outcome.safeZone = [...new Set(committed.flatMap((c) => c.origPath ? [c.origPath, c.path] : [c.path]))].every((f) => (cfg.safePaths ?? []).some((g) => glob(g).test(f)));
 
   const titleMatch = agentSummary.match(/^Title:\s*(.+)$/m);
   const rawTitle = titleMatch?.[1].trim() || `chore: ${firstLine(REQUEST)}`;
@@ -512,16 +559,23 @@ try {
   const headSha = sh("git rev-parse HEAD").stdout.trim();
   const baseTree = sh("git rev-parse HEAD^{tree}").stdout.trim();
   const treeEntries = [];
-  for (const c of changes) {
-    if (c.deleted) {
+  for (const c of committed) {
+    if (c.status[0] === "D") {
       treeEntries.push({ path: c.path, sha: null, mode: "100644", type: "blob" });
       continue;
     }
+    if (c.status[0] === "R" && c.origPath) {
+      treeEntries.push({ path: c.origPath, sha: null, mode: "100644", type: "blob" });
+    }
+    const entry = index.get(c.path);
+    if (!entry) die(`No staged entry for ${c.path}`);
+    if (entry.mode === "160000") die(`Cannot commit ${c.path}: submodules are not supported`);
+    const content = blobContent(entry.sha, work);
     const blob = await api("/git/blobs", {
       method: "POST",
-      body: JSON.stringify({ content: readFileSync(resolve(work, c.path)).toString("base64"), encoding: "base64" }),
+      body: JSON.stringify({ content: content.toString("base64"), encoding: "base64" }),
     });
-    treeEntries.push({ path: c.path, sha: blob.sha, mode: "100644", type: "blob" });
+    treeEntries.push({ path: c.path, sha: blob.sha, mode: entry.mode, type: "blob" });
   }
   const tree = await api("/git/trees", { method: "POST", body: JSON.stringify({ base_tree: baseTree, tree: treeEntries }) });
   const commit = await api("/git/commits", {
@@ -542,7 +596,7 @@ try {
     `|---|---|`,
     `| Session | \`${session}\` |`,
     `| Model | \`${model}\` |`,
-    `| Files | ${changed.length} |`,
+    `| Files | ${committed.length} |`,
     `| Verify | ${Object.entries(outcome.verify).map(([k, v]) => `${k}: ${v}`).join(", ") || "n/a"} |`,
     `| Safe zone | ${outcome.safeZone ? "yes" : "**no — needs review**"} |`,
     "",
