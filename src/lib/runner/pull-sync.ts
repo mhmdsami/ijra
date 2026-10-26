@@ -52,7 +52,7 @@ export function pullStatusMessage(status: "merged" | "closed", prUrl: string) {
   return status === "merged" ? `Merged: ${prUrl}` : `Pull request closed without merging: ${prUrl}`;
 }
 
-const SETTLED = new Set(["done", "merged", "closed", "failed", "cancelled", "answered", "no_changes", "blocked"]);
+const SETTLED = new Set(["done", "merged", "closed", "failed", "cancelled", "answered", "no_changes", "blocked", "rejected"]);
 const REVIEW_SYNC_MS = 60_000;
 
 export function shouldSyncRun(run: { status: string; agent_msg: number; updated_at: number }, now = Date.now()) {

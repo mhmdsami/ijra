@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   if (!run) return NextResponse.json({ ok: true, ignored: true }, { status: 202 });
 
   const to = event.action === "reopened" ? "awaiting_review" : event.merged ? "merged" : "closed";
-  const from = event.action === "reopened" ? ["closed"] : ["awaiting_review"];
+  const from = event.action === "reopened" ? ["closed"] : event.merged ? ["awaiting_review", "rejected"] : ["awaiting_review"];
   const changed = await setRunStatus({
     id: run.id,
     from,

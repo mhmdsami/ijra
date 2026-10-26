@@ -1,5 +1,6 @@
 import { env, now } from "./env";
 import type { ProgressEvent, ProgressKind, ProgressRow, SessionImage } from "./lib/types";
+import { canTransition } from "./lib/runner/transitions";
 
 export const DEFAULT_DAILY_LIMIT = 5;
 
@@ -37,6 +38,7 @@ export interface RunRow {
   dispatch_at: number;
   updated_at: number;
   requested_by: string | null;
+  parent_run_id: string | null;
   policy_status: string;
   policy_reasons: string | null;
   decision: string | null;
@@ -407,7 +409,7 @@ export async function deleteSession(sessionId: string) {
 }
 
 export async function updateRun(id: string, fields: Partial<RunRow>) {
-  const allowed = ["status", "gh_run_id", "gh_run_url", "pr_url", "branch", "safe_zone", "agent_msg", "policy_status", "policy_reasons", "error_detail"] as const;
+  const allowed = ["status", "gh_run_id", "gh_run_url", "pr_url", "branch", "safe_zone", "agent_msg", "policy_status", "policy_reasons", "error_detail", "parent_run_id"] as const;
   const sets = allowed.filter((k) => k in fields);
   if (sets.length === 0) return;
   const sql = `UPDATE runs SET ${sets.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?`;
@@ -453,38 +455,104 @@ export async function setRunStatus(input: {
   return true;
 }
 
-const allowedRunTransitions: Record<string, readonly string[]> = {
-  dispatching: ["running", "done", "failed", "cancelled"],
-  running: ["done", "merged", "failed", "cancelled"],
-  done: ["merged"],
-  awaiting_review: ["merged", "closed"],
-  closed: ["awaiting_review"],
-};
-
-export async function transitionRun(input: {
+export async function decideRun(input: {
   id: string;
+  from: readonly string[];
   status: string;
-  actorId?: string | null;
+  decision: "approved" | "rejected";
+  actorId: string;
+  reason?: string | null;
   action: string;
   metadata?: Record<string, unknown>;
 }) {
-  const run = await getRun(input.id);
-  if (!run || !allowedRunTransitions[run.status]?.includes(input.status)) return false;
-
+  if (!input.from.length) return false;
+  if (!input.from.some((from) => canTransition(from, input.status))) return false;
   const t = now();
-  const metadata = input.metadata ? JSON.stringify(redactAuditMetadata(input.metadata)) : null;
-  const db = env().DB;
-  await db.batch([
-    db.prepare("UPDATE runs SET status = ?, updated_at = ? WHERE id = ? AND status = ?")
-      .bind(input.status, t, input.id, run.status),
-    db.prepare("INSERT INTO audit_events (run_id, session_id, actor_id, action, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(input.id, run.session_id, input.actorId ?? null, input.action, metadata, t),
-  ]);
+  const placeholders = input.from.map(() => "?").join(", ");
+  const { results } = await env().DB.prepare(
+    `UPDATE runs
+     SET status = ?, decision = ?, decided_by = ?, decided_at = ?, decision_reason = ?, updated_at = ?
+     WHERE id = ? AND status IN (${placeholders})
+     RETURNING session_id`
+  )
+    .bind(input.status, input.decision, input.actorId, t, input.reason ?? null, t, input.id, ...input.from)
+    .all<{ session_id: string }>();
+  const updated = results?.[0];
+  if (!updated) return false;
+  await appendAuditEvent({
+    sessionId: updated.session_id,
+    runId: input.id,
+    actorId: input.actorId,
+    action: input.action,
+    metadata: { ...input.metadata, decision: input.decision, reason: input.reason ?? null },
+  });
   return true;
 }
 
 export async function getRun(id: string) {
   return env().DB.prepare("SELECT * FROM runs WHERE id = ?").bind(id).first<RunRow>();
+}
+
+export interface RunAuditRow extends RunRow {
+  requester_email: string | null;
+  decider_email: string | null;
+  owner_email: string | null;
+}
+
+export async function listRecentRuns(input: { limit?: number; project?: string | null; actorId?: string | null } = {}) {
+  const where: string[] = [];
+  const binds: (string | number)[] = [];
+  if (input.project) {
+    where.push("r.project = ?");
+    binds.push(input.project);
+  }
+  if (input.actorId) {
+    where.push("r.requested_by = ?");
+    binds.push(input.actorId);
+  }
+  const { results } = await env().DB.prepare(
+    `SELECT r.*,
+       (SELECT email FROM user WHERE id = r.requested_by) AS requester_email,
+       (SELECT email FROM user WHERE id = r.decided_by) AS decider_email,
+       (SELECT email FROM user WHERE id = s.owner_id) AS owner_email
+     FROM runs r LEFT JOIN sessions s ON s.id = r.session_id
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY r.dispatch_at DESC, r.rowid DESC
+     LIMIT ?`
+  )
+    .bind(...binds, Math.min(Math.max(input.limit ?? 50, 1), 200))
+    .all<RunAuditRow>();
+  return results ?? [];
+}
+
+export interface AuditEventView extends AuditEventRow {
+  actor_email: string | null;
+  project: string | null;
+}
+
+export async function listAuditEvents(input: { limit?: number; project?: string | null; actorId?: string | null } = {}) {
+  const where: string[] = [];
+  const binds: (string | number)[] = [];
+  if (input.project) {
+    where.push("s.project = ?");
+    binds.push(input.project);
+  }
+  if (input.actorId) {
+    where.push("a.actor_id = ?");
+    binds.push(input.actorId);
+  }
+  const { results } = await env().DB.prepare(
+    `SELECT a.*, u.email AS actor_email, s.project AS project
+     FROM audit_events a
+     LEFT JOIN user u ON u.id = a.actor_id
+     LEFT JOIN sessions s ON s.id = a.session_id
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY a.created_at DESC, a.id DESC
+     LIMIT ?`
+  )
+    .bind(...binds, Math.min(Math.max(input.limit ?? 50, 1), 200))
+    .all<AuditEventView>();
+  return results ?? [];
 }
 
 export async function findRunByBranch(project: string, branch: string) {

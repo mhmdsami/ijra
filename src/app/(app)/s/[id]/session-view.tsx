@@ -17,9 +17,12 @@ import { ComposerControls } from "@/components/composer-controls";
 import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
 import { useSessions } from "@/components/sessions-context";
 import { projectConfig } from "@/lib/projects";
+import { canRetry } from "@/lib/runner/transitions";
 import { cn } from "@/lib/utils";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
 import type { StreamEvent } from "@/lib/types";
+
+type RunResult = { ok: boolean; error?: string };
 
 type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; isAdmin: boolean; models: { id: string; label: string; vision: boolean }[]; defaultModel: string };
 const ACTIVE = new Set(["dispatching", "running"]);
@@ -34,6 +37,7 @@ export function SessionView({ initial }: { initial: State }) {
   const imageQueue = useImageQueue();
   const modelSupportsImages = state.models.find((m) => m.id === model)?.vision ?? false;
   const [sendError, setSendError] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
   const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({ text: "", tools: [], stage: "" });
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -148,7 +152,7 @@ export function SessionView({ initial }: { initial: State }) {
     setState((s) => ({
       ...s,
       messages: [...s.messages, { id: -Date.now(), session_id: s.session.id, role: "user", content, meta: null, created_at: Date.now() }],
-      runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, policy_status: "pending", policy_reasons: null, decision: null, decided_by: null, decided_at: null, decision_reason: null, error_detail: null }],
+      runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, parent_run_id: null, policy_status: "pending", policy_reasons: null, decision: null, decided_by: null, decided_at: null, decision_reason: null, error_detail: null }],
     }));
     try {
       const imageIds = imageQueue.images.length > 0 ? await uploadImages(initial.session.id, imageQueue.images) : [];
@@ -181,6 +185,27 @@ export function SessionView({ initial }: { initial: State }) {
       setState((s) => ({ ...s, runs: data.runs }));
     }
     poll();
+  }
+
+  async function runAction(runId: string, action: "merge" | "reject" | "retry", body?: Record<string, unknown>): Promise<RunResult> {
+    if (runId === "pending") return { ok: false, error: "The run has not started yet." };
+    setActing(runId);
+    try {
+      const res = await fetch(`/api/runs/${runId}/${action}`, {
+        method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = (await res.json().catch(() => null)) as { runs?: RunRow[]; error?: string } | null;
+      if (!res.ok) return { ok: false, error: data?.error ?? "The action failed." };
+      if (data?.runs) setState((s) => ({ ...s, runs: data.runs as RunRow[] }));
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "The action failed. Check your connection and try again." };
+    } finally {
+      setActing(null);
+      void refresh();
+    }
   }
 
   async function deleteThread() {
@@ -270,21 +295,26 @@ export function SessionView({ initial }: { initial: State }) {
               )}
             </div>
           )}
-          {!anyActive && <PrCard run={latestRun} />}
+          {!anyActive && <PrCard run={latestRun} isAdmin={initial.isAdmin} onAction={runAction} busy={acting === latestRun?.id} />}
           <div ref={bottomRef} />
         </div>
 
         <div className="shrink-0 pt-2 pb-4 sm:pb-5">
           {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
-          {(silentRun || lastRun?.status === "failed") && (
+          {(silentRun || lastRun?.status === "failed" || lastRun?.status === "cancelled") && (
             <div className="mb-2 space-y-1.5">
               <p role="status" className="text-xs text-destructive">
-                {lastRun?.status === "failed" ? "The run failed." : "The run finished without a reply."}
+                {lastRun?.status === "failed" ? "The run failed." : lastRun?.status === "cancelled" ? "The run was cancelled." : "The run finished without a reply."}
                 {lastRun?.status === "failed" && !initial.isAdmin ? " Ask an admin to check the run logs." : ""}
                 {lastRun?.gh_run_url && (
                   <> <a href={lastRun.gh_run_url} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:text-foreground">Open the run logs</a></>
                 )}
               </p>
+              {initial.isAdmin && lastRun && canRetry(lastRun.status) && (
+                <Button size="xs" variant="outline" onClick={() => runAction(lastRun.id, "retry")} disabled={acting === lastRun.id}>
+                  {acting === lastRun.id ? "Retrying…" : "Retry"}
+                </Button>
+              )}
               {initial.isAdmin && lastRun?.error_detail && (
                 <details className="rounded-md border bg-card px-3 py-2">
                   <summary className="cursor-pointer text-2xs text-text-tertiary">Error details</summary>
@@ -402,12 +432,21 @@ function shortReason(reason: string) {
   return `${reason.slice(0, idx)}: ${paths}`;
 }
 
-function PrCard({ run }: { run: RunRow | undefined }) {
+function PrCard({ run, isAdmin, onAction, busy }: {
+  run: RunRow | undefined;
+  isAdmin: boolean;
+  onAction: (runId: string, action: "merge" | "reject" | "retry", body?: Record<string, unknown>) => Promise<RunResult>;
+  busy: boolean;
+}) {
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
   if (!run || (!run.pr_url && run.status !== "blocked")) return null;
 
   const label =
     run.status === "awaiting_review" ? "Awaiting review"
     : run.status === "merged" ? "Merged"
+    : run.status === "rejected" ? "Rejected"
     : run.status === "closed" ? "Closed"
     : run.status === "blocked" ? "Blocked"
     : run.status === "failed" ? "Failed"
@@ -420,20 +459,70 @@ function PrCard({ run }: { run: RunRow | undefined }) {
   let reasons: string[] = [];
   try { reasons = run.policy_reasons ? JSON.parse(run.policy_reasons) : []; } catch {}
 
+  const canMerge = isAdmin && run.status === "awaiting_review" && !!run.pr_url;
+  const canRetryHere = isAdmin && canRetry(run.status);
+
+  const act = async (action: "merge" | "reject" | "retry", body?: Record<string, unknown>) => {
+    setError(null);
+    const result = await onAction(run.id, action, body);
+    if (!result.ok) {
+      setError(result.error ?? "The action failed.");
+      return;
+    }
+    setRejecting(false);
+    setReason("");
+  };
+
   return (
-    <div className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-card px-4 py-3 sm:flex-row sm:items-center sm:gap-3">
-      <div className="flex min-w-0 flex-wrap items-center gap-3">
-        <Badge variant="outline" className={cn("shrink-0 text-2xs", tone)}>{label}</Badge>
-        {run.pr_url && (
-          <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
-            {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
-          </a>
+    <div className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <Badge variant="outline" className={cn("shrink-0 text-2xs", tone)}>{label}</Badge>
+          {run.pr_url && (
+            <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
+              {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
+            </a>
+          )}
+          {run.branch && <span className="hidden shrink-0 font-mono text-2xs text-text-tertiary sm:inline">{run.branch}</span>}
+        </div>
+        {(canMerge || canRetryHere) && !rejecting && (
+          <div className="flex shrink-0 items-center gap-1.5 sm:ml-auto">
+            {canMerge && <Button size="xs" onClick={() => void act("merge")} disabled={busy}>{busy ? "Merging…" : "Merge"}</Button>}
+            {canMerge && <Button size="xs" variant="ghost" onClick={() => { setRejecting(true); setError(null); }} disabled={busy}>Reject</Button>}
+            {canRetryHere && <Button size="xs" variant="outline" onClick={() => void act("retry")} disabled={busy}>{busy ? "Retrying…" : "Retry"}</Button>}
+          </div>
         )}
-        {run.branch && <span className="hidden shrink-0 font-mono text-2xs text-text-tertiary sm:inline">{run.branch}</span>}
+        {!canMerge && !canRetryHere && reasons.length > 0 && (
+          <span className="text-2xs text-text-tertiary sm:ml-auto" title={reasons[0]}>{shortReason(reasons[0])}</span>
+        )}
       </div>
-      {reasons.length > 0 && (
-        <span className="text-2xs text-text-tertiary sm:ml-auto" title={reasons[0]}>{shortReason(reasons[0])}</span>
+      {run.status === "rejected" && run.decision_reason && (
+        <p className="text-2xs text-text-tertiary">Rejected: {run.decision_reason}</p>
       )}
+      {rejecting && (
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (reason.trim()) void act("reject", { reason: reason.trim() });
+          }}
+        >
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={2}
+            placeholder="Why is this change being rejected?"
+            aria-label="Rejection reason"
+            className="min-h-10 text-xs"
+            autoFocus
+          />
+          <div className="flex items-center gap-1.5">
+            <Button type="submit" size="xs" variant="destructive" disabled={!reason.trim() || busy}>{busy ? "Rejecting…" : "Reject"}</Button>
+            <Button type="button" size="xs" variant="ghost" onClick={() => { setRejecting(false); setReason(""); setError(null); }}>Cancel</Button>
+          </div>
+        </form>
+      )}
+      {error && <p role="alert" className="text-2xs text-destructive">{error}</p>}
     </div>
   );
 }

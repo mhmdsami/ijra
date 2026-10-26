@@ -79,7 +79,7 @@ test("awaiting review syncs after the interval, not before", () => {
 });
 
 test("settled runs never sync", () => {
-  for (const status of ["done", "merged", "closed", "failed", "cancelled", "answered", "no_changes", "blocked"]) {
+  for (const status of ["done", "merged", "closed", "failed", "cancelled", "answered", "no_changes", "blocked", "rejected"]) {
     assert.equal(shouldSyncRun({ status, agent_msg: 1, updated_at: 0 }, 1_000_000), false, status);
   }
 });

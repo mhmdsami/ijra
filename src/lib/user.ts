@@ -2,9 +2,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { auth } from "./auth-server";
-import { adminCount, getUserProjects, promoteToAdmin, type SessionRow } from "@/db";
+import { adminCount, getUserProjects, promoteToAdmin } from "@/db";
 import { projects } from "./projects";
 import { isLocalPreview } from "./local-preview";
+import { canAccessProject, canAccessSession, canReviewRun, canWriteProject } from "./access";
+
+export { canAccessProject, canAccessSession, canReviewRun, canWriteProject };
 
 export interface CurrentUser {
   id: string;
@@ -41,16 +44,4 @@ async function projectGrants(userId: string) {
   const granted = await getUserProjects(userId);
   const known = projects().map((p) => p.id);
   return granted.filter((g) => known.includes(g.project));
-}
-
-export function canAccessProject(user: CurrentUser, project: string) {
-  return user.allowedProjects === null || user.allowedProjects.includes(project);
-}
-
-export function canWriteProject(user: CurrentUser, project: string) {
-  return user.writeProjects === null || user.writeProjects.includes(project);
-}
-
-export function canAccessSession(user: CurrentUser, session: SessionRow) {
-  return user.isAdmin || (session.owner_id === user.id && canAccessProject(user, session.project));
 }

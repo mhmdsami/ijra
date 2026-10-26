@@ -1,6 +1,7 @@
 import { env } from "../../env";
 import { setRunStatus, updateRun } from "../../db";
 import { RUNNER_REPO, projectConfig } from "../projects";
+import { pullNumberFrom, reviewMerge, type CheckRunSummary, type PullFile } from "./review";
 import { runStateFromPull } from "./pull-sync";
 import type { RunState } from "./types";
 
@@ -12,6 +13,11 @@ type GHPull = {
   merged_at?: string | null;
   head: { ref: string };
   body: string | null;
+};
+type GHPullDetail = GHPull & {
+  mergeable?: boolean | null;
+  changed_files?: number | null;
+  head: { ref: string; sha: string };
 };
 
 export type SyncResult = RunState & { agentSummary: string | null; changed: boolean };
@@ -64,6 +70,48 @@ export async function cancelRun(run: { ghRunId: number | null }) {
   if (run.ghRunId) {
     await gh(`/repos/${RUNNER_REPO}/actions/runs/${run.ghRunId}/cancel`, { method: "POST" });
   }
+}
+
+export interface PullReview {
+  ok: boolean;
+  reasons: string[];
+  number: number | null;
+  sha: string | null;
+}
+
+export async function inspectPull(repo: string, prUrl: string, policyStatus: string): Promise<PullReview> {
+  const number = pullNumberFrom(prUrl);
+  if (!number) return { ok: false, reasons: ["the pull request URL is not recognised"], number: null, sha: null };
+  const pull = await gh<GHPullDetail>(`/repos/${repo}/pulls/${number}`);
+  if (!pull) return { ok: false, reasons: ["the pull request no longer exists"], number, sha: null };
+
+  const [files, checks, combined] = await Promise.all([
+    gh<PullFile[]>(`/repos/${repo}/pulls/${number}/files?per_page=100`),
+    gh<{ check_runs: CheckRunSummary[] }>(`/repos/${repo}/commits/${pull.head.sha}/check-runs?per_page=100`),
+    gh<{ state: string; total_count: number }>(`/repos/${repo}/commits/${pull.head.sha}/status`),
+  ]);
+
+  const review = reviewMerge({
+    pull,
+    checks: {
+      checkRuns: checks?.check_runs ?? [],
+      combinedState: combined?.state ?? null,
+      combinedCount: combined?.total_count ?? 0,
+    },
+    files: (files ?? []).map((file) => ({ filename: file.filename, additions: file.additions, deletions: file.deletions })),
+    policyStatus,
+  });
+
+  return { ...review, number, sha: pull.head.sha };
+}
+
+export async function mergePull(repo: string, number: number, sha: string) {
+  const result = await gh<{ merged: boolean; message: string }>(`/repos/${repo}/pulls/${number}/merge`, {
+    method: "PUT",
+    body: JSON.stringify({ merge_method: "squash", sha }),
+  });
+  if (!result?.merged) throw new Error(result?.message || "GitHub did not merge the pull request");
+  return result;
 }
 
 export async function syncRun(run: {
