@@ -25,6 +25,9 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=low
 
+      - name: Test
+        run: npm test
+
       - name: Write private project config
         run: echo '${{ secrets.PROJECTS_JSON }}' > src/projects.json
 
