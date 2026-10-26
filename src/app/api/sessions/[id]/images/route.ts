@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSameOrigin } from "@/lib/csrf";
 import { addImage, getSession } from "@/db";
 import { canAccessSession, requireUser } from "@/lib/user";
-import { decodeBase64Image, imageMetaError } from "@/lib/images";
+import { decodeBase64Image, imageMetaError, MAX_IMAGES_PER_SESSION, MAX_IMAGES_PER_USER_PER_DAY } from "@/lib/images";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,12 +19,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const invalid = imageMetaError(body.mime, bytes);
   if (invalid) return NextResponse.json({ error: invalid }, { status: 413 });
 
-  const imageId = await addImage({
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const image = await addImage({
     sessionId: id,
+    ownerId: session.owner_id ?? user.id,
     mime: body.mime,
     width: Number.isInteger(body.width) ? (body.width as number) : null,
     height: Number.isInteger(body.height) ? (body.height as number) : null,
     bytes,
+    dayStart: dayStart.getTime(),
   });
-  return NextResponse.json({ id: imageId });
+  if ("error" in image) {
+    return NextResponse.json(
+      {
+        error: image.error === "session"
+          ? `this session has reached its image limit (${MAX_IMAGES_PER_SESSION})`
+          : `image upload limit reached (${MAX_IMAGES_PER_USER_PER_DAY} per day)`,
+      },
+      { status: 429 },
+    );
+  }
+  return NextResponse.json({ id: image.id });
 }

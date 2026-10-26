@@ -15,6 +15,8 @@ Grants are stored in `user_projects`. The project list comes from `src/projects.
 
 Each user has a daily request limit, default 5. A project can have one active run at a time. `createRun` enforces both atomically.
 
+Images have separate storage caps: 3 per message, 1.5 MB each, 20 per session, and 40 per user per UTC day. The upload insert enforces the session and daily caps in one statement, and deleting a thread deletes its images.
+
 ## Models
 
 `/admin/models` lists models from the opencode-go catalog at models.dev. Enable the models that should appear in the composer, pick a default, and remove ones you no longer use. The catalog is cached in memory for 5 minutes; a failed refresh does not authorize a model that could not be verified.

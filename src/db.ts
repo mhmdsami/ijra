@@ -2,6 +2,8 @@ import { env, now } from "./env";
 import type { ProgressEvent, ProgressKind, ProgressRow, SessionImage } from "./lib/types";
 import { canTransition } from "./lib/runner/transitions";
 import { ACTIVE_RUN_STATUSES, admissionStatement } from "./lib/admission";
+import { imageInsertStatement } from "./lib/image-storage";
+import { MAX_IMAGES_PER_SESSION } from "./lib/images";
 
 export const DEFAULT_DAILY_LIMIT = 5;
 
@@ -335,13 +337,44 @@ export async function createRun(
   return result.meta.changes === 1 ? id : null;
 }
 
-export async function addImage(input: { sessionId: string; mime: string; width: number | null; height: number | null; bytes: Uint8Array }) {
+export async function addImage(input: {
+  sessionId: string;
+  ownerId: string;
+  mime: string;
+  width: number | null;
+  height: number | null;
+  bytes: Uint8Array;
+  dayStart: number;
+}): Promise<{ id: string } | { error: "session" | "user" }> {
   const id = crypto.randomUUID();
-  await env()
-    .DB.prepare("INSERT INTO images (id, session_id, mime, width, height, bytes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(id, input.sessionId, input.mime, input.width, input.height, input.bytes, now())
-    .run();
-  return id;
+  const { sql, binds } = imageInsertStatement({
+    id,
+    sessionId: input.sessionId,
+    ownerId: input.ownerId,
+    mime: input.mime,
+    width: input.width,
+    height: input.height,
+    bytes: input.bytes,
+    createdAt: now(),
+    dayStart: input.dayStart,
+  });
+  const result = await env().DB.prepare(sql).bind(...binds).run();
+  if (result.meta.changes === 1) return { id };
+  const sessionCount = await countImagesForSession(input.sessionId);
+  return { error: sessionCount >= MAX_IMAGES_PER_SESSION ? "session" : "user" };
+}
+
+export async function countImagesForSession(sessionId: string) {
+  const row = await env().DB.prepare("SELECT COUNT(*) AS n FROM images WHERE session_id = ?").bind(sessionId).first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export async function countImagesForOwnerSince(ownerId: string, since: number) {
+  const row = await env()
+    .DB.prepare("SELECT COUNT(*) AS n FROM images i JOIN sessions s ON s.id = i.session_id WHERE s.owner_id = ? AND i.created_at >= ?")
+    .bind(ownerId, since)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
 }
 
 export async function getImage(id: string) {
@@ -405,6 +438,8 @@ export async function clearProgress(runId: string) {
 export async function deleteSession(sessionId: string) {
   const db = env().DB;
   await db.batch([
+    db.prepare("DELETE FROM run_progress WHERE run_id IN (SELECT id FROM runs WHERE session_id = ?)").bind(sessionId),
+    db.prepare("DELETE FROM images WHERE session_id = ?").bind(sessionId),
     db.prepare("DELETE FROM runs WHERE session_id = ?").bind(sessionId),
     db.prepare("DELETE FROM messages WHERE session_id = ?").bind(sessionId),
     db.prepare("DELETE FROM sessions WHERE id = ?").bind(sessionId),

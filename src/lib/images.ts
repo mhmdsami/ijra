@@ -1,5 +1,7 @@
 export const MAX_IMAGES_PER_MESSAGE = 3;
 export const MAX_IMAGE_BYTES = 1_500_000;
+export const MAX_IMAGES_PER_SESSION = 20;
+export const MAX_IMAGES_PER_USER_PER_DAY = 40;
 export const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const SIGNED_URL_TTL_MS = 30 * 60_000;
 
