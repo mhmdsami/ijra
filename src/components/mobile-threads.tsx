@@ -59,7 +59,7 @@ export function MobileThreads() {
                 <button ref={closeRef} onClick={() => setOpen(false)} className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground" aria-label="Close threads"><X className="size-4" /></button>
               </div>
             </div>
-            <div className="scrollbar-thin flex-1 overflow-y-auto px-2 py-1">
+            <div className="flex-1 overflow-y-auto px-2 py-1">
               {sessions.length === 0 ? <EmptyState variant="inline" title="No threads yet" description="Your requests will appear here." /> : (
                 <ul className="flex flex-col gap-0.5">
                   {sessions.map((session) => (

@@ -223,7 +223,7 @@ export function SessionView({ initial }: { initial: State }) {
 
       <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 sm:px-6">
         {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
-        <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 sm:gap-7 sm:py-10">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 sm:gap-7 sm:py-10">
           {state.messages.length === 0 && (
             <EmptyState
               icon={MessageSquarePlus}
@@ -266,7 +266,7 @@ export function SessionView({ initial }: { initial: State }) {
                 </div>
               )}
               {live.text.length > 0 && (
-                <p className="scrollbar-thin max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">{live.text}</p>
+                <p className="max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">{live.text}</p>
               )}
             </div>
           )}
