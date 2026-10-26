@@ -44,6 +44,7 @@ export interface RunRow {
   parent_run_id: string | null;
   policy_status: string;
   policy_reasons: string | null;
+  checks_status: string | null;
   decision: string | null;
   decided_by: string | null;
   decided_at: number | null;
@@ -447,7 +448,7 @@ export async function deleteSession(sessionId: string) {
 }
 
 export async function updateRun(id: string, fields: Partial<RunRow>) {
-  const allowed = ["status", "gh_run_id", "gh_run_url", "pr_url", "branch", "safe_zone", "agent_msg", "policy_status", "policy_reasons", "error_detail", "parent_run_id"] as const;
+  const allowed = ["status", "gh_run_id", "gh_run_url", "pr_url", "branch", "safe_zone", "agent_msg", "policy_status", "policy_reasons", "checks_status", "error_detail", "parent_run_id"] as const;
   const sets = allowed.filter((k) => k in fields);
   if (sets.length === 0) return;
   const sql = `UPDATE runs SET ${sets.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?`;

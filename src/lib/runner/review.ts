@@ -50,6 +50,16 @@ export function checkState(checks: CheckSummary) {
   };
 }
 
+export type CheckOutcome = "passing" | "failing" | "pending" | "none";
+
+export function checkOutcome(checks: CheckSummary): CheckOutcome {
+  const state = checkState(checks);
+  if (state.failing > 0) return "failing";
+  if (state.pending > 0) return "pending";
+  if (state.total > 0 || checks.combinedState === "success") return "passing";
+  return "none";
+}
+
 export function reviewMerge(input: ReviewInput): ReviewResult {
   const reasons: string[] = [];
 

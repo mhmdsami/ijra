@@ -152,7 +152,7 @@ export function SessionView({ initial }: { initial: State }) {
     setState((s) => ({
       ...s,
       messages: [...s.messages, { id: -Date.now(), session_id: s.session.id, role: "user", content, meta: null, created_at: Date.now() }],
-      runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, parent_run_id: null, policy_status: "pending", policy_reasons: null, decision: null, decided_by: null, decided_at: null, decision_reason: null, error_detail: null }],
+      runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, parent_run_id: null, policy_status: "pending", policy_reasons: null, checks_status: null, decision: null, decided_by: null, decided_at: null, decision_reason: null, error_detail: null }],
     }));
     try {
       const imageIds = imageQueue.images.length > 0 ? await uploadImages(initial.session.id, imageQueue.images) : [];
@@ -484,6 +484,18 @@ function PrCard({ run, isAdmin, onAction, busy }: {
             </a>
           )}
           {run.branch && <span className="hidden shrink-0 font-mono text-2xs text-text-tertiary sm:inline">{run.branch}</span>}
+          {run.checks_status && run.checks_status !== "none" && (
+            <span
+              className={cn(
+                "shrink-0 font-mono text-2xs",
+                run.checks_status === "failing" ? "text-destructive"
+                : run.checks_status === "pending" ? "text-text-tertiary"
+                : "text-primary"
+              )}
+            >
+              checks {run.checks_status}
+            </span>
+          )}
         </div>
         {(canMerge || canRetryHere) && !rejecting && (
           <div className="flex shrink-0 items-center gap-1.5 sm:ml-auto">

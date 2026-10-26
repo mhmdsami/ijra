@@ -1,7 +1,7 @@
 import { env } from "../../env";
 import { setRunStatus, updateRun } from "../../db";
 import { RUNNER_REPO, projectConfig } from "../projects";
-import { pullNumberFrom, reviewMerge, type CheckRunSummary, type PullFile } from "./review";
+import { pullNumberFrom, reviewMerge, checkOutcome, type CheckOutcome, type CheckRunSummary, type CheckSummary, type PullFile } from "./review";
 import { runStateFromPull } from "./pull-sync";
 import type { RunState } from "./types";
 
@@ -85,24 +85,44 @@ export async function inspectPull(repo: string, prUrl: string, policyStatus: str
   const pull = await gh<GHPullDetail>(`/repos/${repo}/pulls/${number}`);
   if (!pull) return { ok: false, reasons: ["the pull request no longer exists"], number, sha: null };
 
-  const [files, checks, combined] = await Promise.all([
+  const [files, checks] = await Promise.all([
     gh<PullFile[]>(`/repos/${repo}/pulls/${number}/files?per_page=100`),
-    gh<{ check_runs: CheckRunSummary[] }>(`/repos/${repo}/commits/${pull.head.sha}/check-runs?per_page=100`),
-    gh<{ state: string; total_count: number }>(`/repos/${repo}/commits/${pull.head.sha}/status`),
+    readChecks(repo, pull.head.sha),
   ]);
 
   const review = reviewMerge({
     pull,
-    checks: {
-      checkRuns: checks?.check_runs ?? [],
-      combinedState: combined?.state ?? null,
-      combinedCount: combined?.total_count ?? 0,
-    },
+    checks,
     files: (files ?? []).map((file) => ({ filename: file.filename, additions: file.additions, deletions: file.deletions })),
     policyStatus,
   });
 
   return { ...review, number, sha: pull.head.sha };
+}
+
+async function readChecks(repo: string, sha: string): Promise<CheckSummary> {
+  const [checks, combined] = await Promise.all([
+    gh<{ check_runs: CheckRunSummary[] }>(`/repos/${repo}/commits/${sha}/check-runs?per_page=100`),
+    gh<{ state: string; total_count: number }>(`/repos/${repo}/commits/${sha}/status`),
+  ]);
+  return {
+    checkRuns: checks?.check_runs ?? [],
+    combinedState: combined?.state ?? null,
+    combinedCount: combined?.total_count ?? 0,
+  };
+}
+
+export async function pullChecks(repo: string, prUrl: string): Promise<CheckOutcome> {
+  const number = pullNumberFrom(prUrl);
+  if (!number) return "none";
+  const pull = await gh<{ head: { sha: string } }>(`/repos/${repo}/pulls/${number}`);
+  if (!pull?.head?.sha) return "none";
+  return checkOutcome(await readChecks(repo, pull.head.sha));
+}
+
+async function persistChecks(runId: string, repo: string, prUrl: string) {
+  const outcome = await pullChecks(repo, prUrl).catch(() => null);
+  if (outcome) await updateRun(runId, { checks_status: outcome });
 }
 
 export async function mergePull(repo: string, number: number, sha: string) {
@@ -130,6 +150,7 @@ export async function syncRun(run: {
     const pr = await findPr(cfg.repo, run.session, run.branch);
     if (!pr) return { status: "awaiting_review", prUrl: null, safeZone: null, agentSummary: null, changed: false };
     const state = runStateFromPull(pr);
+    if (state.status === "awaiting_review") await persistChecks(run.id, cfg.repo, pr.html_url);
     const changed = state.status === "awaiting_review"
       ? false
       : await setRunStatus({
@@ -182,6 +203,7 @@ export async function syncRun(run: {
   }
 
   const state = runStateFromPull(pr);
+  if (state.status === "awaiting_review") await persistChecks(run.id, cfg.repo, pr.html_url);
   const changed = await setRunStatus({
     id: run.id,
     from: [run.status],

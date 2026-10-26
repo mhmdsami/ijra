@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkState, pullNumberFrom, reviewMerge, type ReviewInput } from "./review.ts";
+import { checkOutcome, checkState, pullNumberFrom, reviewMerge, type ReviewInput } from "./review.ts";
 
 function input(overrides: Partial<ReviewInput> = {}): ReviewInput {
   return {
@@ -88,4 +88,12 @@ test("extracts the pull number from a PR URL", () => {
   assert.equal(pullNumberFrom("https://github.com/owner/repo/pull/42/files"), 42);
   assert.equal(pullNumberFrom("https://github.com/owner/repo/issues/42"), null);
   assert.equal(pullNumberFrom(""), null);
+});
+
+test("summarises check state for the card", () => {
+  assert.equal(checkOutcome({ checkRuns: [], combinedState: "pending", combinedCount: 0 }), "none");
+  assert.equal(checkOutcome({ checkRuns: [{ status: "completed", conclusion: "success" }], combinedState: "success" }), "passing");
+  assert.equal(checkOutcome({ checkRuns: [], combinedState: "success", combinedCount: 1 }), "passing");
+  assert.equal(checkOutcome({ checkRuns: [{ status: "completed", conclusion: "failure" }], combinedState: null }), "failing");
+  assert.equal(checkOutcome({ checkRuns: [{ status: "in_progress", conclusion: null }], combinedState: null }), "pending");
 });
