@@ -22,7 +22,7 @@ You are working in ijra, a service that runs small fixes and answers questions a
 
 - Conventional Commits, imperative subject, 50 chars or fewer. Branch prefixes: `ft-`, `fx-`, `ch-`, `rf-`.
 - No new dependencies without asking. The dashboard runs on Workers, so anything Node-only won't survive; check workerd compatibility.
-- Verify with `npx tsc --noEmit` before pushing, and `node --check runner/run-request.mjs` after touching the runner.
+- Verify with `npx tsc --noEmit` and `npm test` before pushing, and `node --check runner/run-request.mjs` after touching the runner.
 - Deploys run automatically via `.github/workflows/deploy.yml` on every push to main (typecheck, D1 migrations, `opennextjs-cloudflare deploy`). Don't deploy manually unless the Action can't; migrations apply as part of the deploy.
 - Auth is better-auth with the admin plugin. Admins see all projects; everyone else sees only what's granted in `user_projects` and their own sessions. The first sign-in on an empty database becomes admin, so never point strangers at a fresh deployment before Sami has signed in.
 - Never log or commit secrets. The Google OAuth client secret, PAT, Cloudflare API token, and signing keys live in Worker/repo secrets.

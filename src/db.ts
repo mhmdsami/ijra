@@ -1,6 +1,7 @@
 import { env, now } from "./env";
 import type { ProgressEvent, ProgressKind, ProgressRow, SessionImage } from "./lib/types";
 import { canTransition } from "./lib/runner/transitions";
+import { ACTIVE_RUN_STATUSES, admissionStatement } from "./lib/admission";
 
 export const DEFAULT_DAILY_LIMIT = 5;
 
@@ -295,7 +296,7 @@ export async function removeUserLimit(userId: string) {
   await env().DB.prepare("DELETE FROM user_limits WHERE user_id = ?").bind(userId).run();
 }
 
-const activeRunStatuses = ["dispatching", "running"];
+const activeRunStatuses = ACTIVE_RUN_STATUSES;
 
 export async function countActiveRunsForProject(project: string) {
   const row = await env().DB.prepare(
@@ -318,17 +319,19 @@ export async function createRun(
 ) {
   const id = crypto.randomUUID();
   const t = now();
-  const limitClause = dailyLimit === null ? "" : " AND (SELECT COUNT(*) FROM runs WHERE requested_by = ? AND dispatch_at >= ?) < ?";
-  const limitBinds = dailyLimit === null ? [] : [requestedBy, requestWindowStart, dailyLimit];
-  const result = await env().DB.prepare(
-    `INSERT INTO runs (id, session_id, project, request, model, requested_by, mode, status, dispatch_at, updated_at)
-     SELECT ?, ?, ?, ?, ?, ?, ?, 'dispatching', ?, ?
-     WHERE NOT EXISTS (
-       SELECT 1 FROM runs WHERE project = ? AND status IN (${activeRunStatuses.map(() => "?").join(", ")})
-     )${limitClause}`
-  )
-    .bind(id, sessionId, project, request, model, requestedBy, mode, t, t, project, ...activeRunStatuses, ...limitBinds)
-    .run();
+  const { sql, binds } = admissionStatement({
+    id,
+    sessionId,
+    project,
+    request,
+    model,
+    requestedBy,
+    requestWindowStart,
+    dailyLimit,
+    mode,
+    dispatchAt: t,
+  });
+  const result = await env().DB.prepare(sql).bind(...binds).run();
   return result.meta.changes === 1 ? id : null;
 }
 

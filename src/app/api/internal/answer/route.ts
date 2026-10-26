@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { addMessage, appendAuditEvent, clearProgress, getRun, touchSessionTitle, updateRun } from "@/db";
 import { validSignature } from "@/lib/webhook";
+import { acceptsReport, parseRunnerReport, reportFingerprint, reportMessage, reportStatus } from "@/lib/runner/report";
+import { PRUNE_CALLBACKS_SQL, RECORD_CALLBACK_SQL, REPLAY_TTL_MS } from "@/lib/runner/replay";
 import { env } from "@/env";
 
 function parseJson(body: string) {
@@ -16,22 +18,22 @@ export async function POST(req: Request) {
   if (!(await validSignature(body, req.headers.get("x-ijra-timestamp") ?? "", req.headers.get("x-ijra-signature") ?? ""))) {
     return NextResponse.json({ error: "invalid runner signature" }, { status: 401 });
   }
-  const payload = parseJson(body) as { runId?: string; status?: string; summary?: string; outcome?: { prUrl?: string; branch?: string; policyReasons?: string[]; title?: string; error?: string } };
-  if (!payload) return NextResponse.json({ error: "invalid body" }, { status: 400 });
-  if (!payload.runId || !payload.status) return NextResponse.json({ error: "runId and status are required" }, { status: 400 });
-  const fingerprint = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${req.headers.get("x-ijra-timestamp")}.${body}`)))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  const replay = await env().DB.prepare("INSERT OR IGNORE INTO runner_callbacks (fingerprint, run_id, received_at) VALUES (?, ?, ?)").bind(fingerprint, payload.runId, Date.now()).run();
+  const parsed = parseJson(body);
+  if (!parsed) return NextResponse.json({ error: "invalid body" }, { status: 400 });
+  const payload = parseRunnerReport(parsed);
+  if (!payload) return NextResponse.json({ error: "runId and status are required" }, { status: 400 });
+  const fingerprint = await reportFingerprint(req.headers.get("x-ijra-timestamp") ?? "", body);
+  const replay = await env().DB.prepare(RECORD_CALLBACK_SQL).bind(fingerprint, payload.runId, Date.now()).run();
   if (replay.meta.changes !== 1) return NextResponse.json({ ok: true });
-  await env().DB.prepare("DELETE FROM runner_callbacks WHERE received_at < ?").bind(Date.now() - 24 * 60 * 60_000).run();
+  await env().DB.prepare(PRUNE_CALLBACKS_SQL).bind(Date.now() - REPLAY_TTL_MS).run();
   const run = await getRun(payload.runId);
   if (!run) return NextResponse.json({ error: "unknown run" }, { status: 404 });
-  if (!["dispatching", "running", "failed"].includes(run.status)) return NextResponse.json({ error: "invalid run transition" }, { status: 409 });
-  const status = ["answered", "no_changes", "awaiting_review", "failed", "blocked"].includes(payload.status) ? payload.status : "failed";
-  const summary = payload.summary?.trim();
-  const errorDetail = status === "failed" ? (payload.outcome?.error?.trim() || summary?.replace(/^Run failed:\s*/, "") || "The run failed before it could reply.").slice(0, 4000) : null;
-  const visibleSummary = status === "failed" ? "The run failed before it could reply." : summary;
-  await updateRun(run.id, { status, pr_url: payload.outcome?.prUrl ?? null, branch: payload.outcome?.branch ?? null, agent_msg: visibleSummary ? 1 : 0, policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed", policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []), error_detail: errorDetail });
-  if (visibleSummary) await addMessage(run.session_id, "agent", visibleSummary);
+  if (!acceptsReport(run.status)) return NextResponse.json({ error: "invalid run transition" }, { status: 409 });
+
+  const status = reportStatus(payload.status);
+  const { visible, errorDetail } = reportMessage({ status, summary: payload.summary, error: payload.outcome?.error });
+  await updateRun(run.id, { status, pr_url: payload.outcome?.prUrl ?? null, branch: payload.outcome?.branch ?? null, agent_msg: visible ? 1 : 0, policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed", policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []), error_detail: errorDetail });
+  if (visible) await addMessage(run.session_id, "agent", visible);
   await clearProgress(run.id);
   const title = payload.outcome?.title?.trim();
   if (title) await touchSessionTitle(run.session_id, title.slice(0, 80));
