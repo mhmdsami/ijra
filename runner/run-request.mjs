@@ -4,6 +4,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHmac, createSign } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { branchFromTitle, changedLineCount, classifyChanges, firstLine, glob } from "./policy.mjs";
 
 class RunError extends Error {}
 function die(msg) {
@@ -23,10 +24,6 @@ function sh(...args) {
 
 function shq(s) {
   return `'${s.replace(/'/g, `'\\''`)}'`;
-}
-
-function firstLine(s) {
-  return s.trim().split("\n")[0];
 }
 
 function parseNameStatus(output) {
@@ -64,26 +61,6 @@ function blobContent(sha, cwd) {
   const result = spawnSync("git", ["cat-file", "blob", sha], { cwd, maxBuffer: 100 * 1024 * 1024 });
   if (result.status !== 0) die(`Cannot read staged blob ${sha}`);
   return result.stdout;
-}
-
-function changedLineCount(shortstat) {
-  const added = Number(shortstat.match(/(\d+) insertion/)?.[1] ?? 0);
-  const deleted = Number(shortstat.match(/(\d+) deletion/)?.[1] ?? 0);
-  return added + deleted;
-}
-
-function slug(s) {
-  return firstLine(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "request";
-}
-
-function glob(pattern) {
-  const esc = pattern
-    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*\*/g, "\0")
-    .replace(/\*/g, "[^/]*")
-    .replace(/\0/g, ".*")
-    .replace(/\?/g, ".");
-  return new RegExp(`^${esc}$`);
 }
 
 async function mintInstallationToken() {
@@ -502,14 +479,8 @@ try {
   }
   outcome.changedFiles = changed;
   outcome.agentSummary = agentSummary;
-  const protectedPath = /(^|\/)(package(-lock)?\.json|bun\.lockb?|pnpm-lock\.yaml|yarn\.lock|\.github\/|migrations?\/|src\/lib\/|src\/app\/api\/|auth)/i;
-  const protectedHits = affected.filter((file) => protectedPath.test(file));
-  const outsideZone = affected.filter((file) => !protectedPath.test(file) && !(cfg.safePaths ?? []).some((pattern) => glob(pattern).test(file)));
   outcome.changedLines = changedLineCount(sh("git diff --cached --shortstat", "line-stats", { env: cleanEnv }).stdout);
-  if (changed.length > 12) outcome.policyReasons.push(`changed ${changed.length} files; limit is 12`);
-  if (outcome.changedLines > 400) outcome.policyReasons.push(`changed ${outcome.changedLines} lines; limit is 400`);
-  if (protectedHits.length) outcome.policyReasons.push(`protected path, needs a manual change: ${protectedHits.join(", ")}`);
-  if (outsideZone.length) outcome.policyReasons.push(`outside the safe zone: ${outsideZone.join(", ")}`);
+  outcome.policyReasons.push(...classifyChanges({ changed, affected, changedLines: outcome.changedLines, safePaths: cfg.safePaths ?? [] }).reasons);
   if (outcome.policyReasons.length) {
     outcome.status = "blocked";
     outcome.agentSummary = [outcome.agentSummary, `Blocked by policy: ${outcome.policyReasons.join("; ")}`].filter(Boolean).join("\n\n");
@@ -542,12 +513,7 @@ try {
 
   const titleMatch = agentSummary.match(/^Title:\s*(.+)$/m);
   const rawTitle = titleMatch?.[1].trim() || `chore: ${firstLine(REQUEST)}`;
-  const conv = rawTitle.match(/^(\w+):\s*(.+)$/);
-  const TYPE_BRANCH = { feat: "ft", fix: "fx", chore: "ch", refactor: "rf", docs: "ch" };
-  const type = conv && TYPE_BRANCH[conv[1].toLowerCase()] ? conv[1].toLowerCase() : "chore";
-  const subject = (conv ? conv[2] : rawTitle).trim().replace(/[.!]+$/, "").slice(0, 50);
-  const title = `${type}: ${subject}`;
-  const branch = `${TYPE_BRANCH[type]}-${session.slice(0, 8)}-${slug(subject)}`;
+  const { title, branch } = branchFromTitle(rawTitle, session);
   outcome.branch = branch;
   const description = titleMatch
     ? agentSummary

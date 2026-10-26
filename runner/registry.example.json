@@ -18,8 +18,8 @@
       }
     ],
     "safePaths": [
-      "src/**",
-      "public/**"
+      "src/app/**",
+      "src/components/**"
     ]
   }
 }
