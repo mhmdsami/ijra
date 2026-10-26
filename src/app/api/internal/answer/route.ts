@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addMessage, appendAuditEvent, clearProgress, getRun, setSessionTitle, updateRun } from "@/db";
+import { addMessage, appendAuditEvent, clearProgress, getRun, touchSessionTitle, updateRun } from "@/db";
 import { validSignature } from "@/lib/webhook";
 import { env } from "@/env";
 
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   if (visibleSummary) await addMessage(run.session_id, "agent", visibleSummary);
   await clearProgress(run.id);
   const title = payload.outcome?.title?.trim();
-  if (title) await setSessionTitle(run.session_id, title.slice(0, 80));
+  if (title) await touchSessionTitle(run.session_id, title.slice(0, 80));
   await appendAuditEvent({ sessionId: run.session_id, runId: run.id, action: "runner.reported", metadata: { status, policyReasons: payload.outcome?.policyReasons ?? [] } });
   return NextResponse.json({ ok: true });
 }

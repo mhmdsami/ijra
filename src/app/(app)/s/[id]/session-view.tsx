@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquarePlus, Trash2, User } from "lucide-react";
+import { MessageSquarePlus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -348,31 +348,20 @@ function Message({ role, content, meta, index }: { role: string; content: string
   } catch {
   }
   return (
-    <article className="animate-fade-up flex gap-3" style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
-      <span
-        aria-hidden
-        className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-md border border-border",
-          isUser ? "bg-surface-2" : "bg-surface-1"
-        )}
-      >
-        {isUser ? <User className="size-3.5 text-text-secondary" /> : <Wordmark className="text-[10px] text-primary" />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
-        {isUser ? (
-          <div className="w-fit max-w-full rounded-lg bg-surface-2 px-3 py-2.5">
-            {imageIds.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
-              </div>
-            )}
-            <div className="text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
-          </div>
-        ) : (
-          <Markdown text={content} />
-        )}
-      </div>
+    <article className="animate-fade-up border-l border-border pl-4" style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
+      <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
+      {isUser ? (
+        <>
+          {imageIds.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
+            </div>
+          )}
+          <div className="text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
+        </>
+      ) : (
+        <Markdown text={content} />
+      )}
     </article>
   );
 }

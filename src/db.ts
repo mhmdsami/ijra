@@ -498,10 +498,6 @@ export async function getRuns(sessionId: string) {
   return results ?? [];
 }
 
-export async function setSessionTitle(sessionId: string, title: string) {
-  await env().DB.prepare("UPDATE sessions SET title = ? WHERE id = ?").bind(title, sessionId).run();
-}
-
 export async function touchSessionTitle(sessionId: string, title: string) {
   await env().DB.prepare("UPDATE sessions SET title = ? WHERE id = ? AND title = ''").bind(title, sessionId).run();
 }
