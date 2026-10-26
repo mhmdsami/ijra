@@ -23,12 +23,12 @@ The runner builds the prompt from the request and the target repo's `AGENTS.md`,
 
 Before a PR is created, the runner checks:
 
-- every changed file is inside the project's `safePaths`
-- protected paths such as CI, dependencies, and auth are untouched
+- every changed file is inside the project's `safePaths`, which are explicit allowlists rather than whole-tree globs
+- protected paths such as CI, dependencies, migrations, `src/lib`, API routes, and auth are untouched, even when an allowlist would cover them
 - no more than 12 files changed
 - no more than 400 changed lines
 
-A failed check marks the run blocked. There is no auto-merge.
+A failed check marks the run blocked. The runner never merges; admins merge from the session after the dashboard repeats the file, line, policy, and check-run validation.
 
 ## Verification and PRs
 

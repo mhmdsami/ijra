@@ -19,9 +19,19 @@ Each user has a daily request limit, default 5. A project can have one active ru
 
 `/admin/models` lists models from the opencode-go catalog at models.dev. Enable the models that should appear in the composer, pick a default, and remove ones you no longer use. The catalog is cached in memory for 5 minutes; a failed refresh does not authorize a model that could not be verified.
 
+## Review
+
+A change run ends at `awaiting_review` with its pull request. Admins can act from the session:
+
+- **Merge** re-reads the pull request, its changed files, and its check runs, re-applies the 12-file and 400-line limits, then squash-merges. Failing or pending checks block the merge.
+- **Reject** requires a reason, marks the run rejected, and leaves the pull request open.
+- **Retry** re-dispatches a failed, cancelled, rejected, blocked, or closed run as a new run linked to its source.
+
+Every action writes an audit event. There is still no automatic merge.
+
 ## Audit
 
-Every request, report, cancel, delete, grant change, and model change writes to `audit_events`. Database triggers reject updates and deletes, so the log is append-only.
+`/admin/audit` lists the most recent runs and audit events, filterable by project and requester. Every request, report, cancel, delete, review action, grant change, and model change writes to `audit_events`. Database triggers reject updates and deletes, so the log is append-only.
 
 ## First admin
 

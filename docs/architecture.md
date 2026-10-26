@@ -14,8 +14,8 @@ ijra has two parts. The dashboard lives in this repo and runs on Cloudflare Work
 1. The dashboard creates a session and dispatches the runner workflow with the project, request, session id, mode, and run id.
 2. The runner clones the repo and runs pi on a model from opencode-go. The pi session id and directory round-trip through Actions artifacts, so one ijra session keeps one agent memory.
 3. The agent decides whether the request is a question or a change. Questions return in chat. Changes are implemented and checked against policy: paths outside `safePaths`, protected paths such as CI, dependencies, or auth, more than 12 files, or more than 400 changed lines all fail the run.
-4. Clean changes are type-checked and built per the registry, committed through the Git data API with a verified signature, and opened as a pull request. There is no auto-merge.
-5. The runner reports back over an HMAC-signed webhook. The dashboard also polls the Actions API as a fallback.
+4. Clean changes are type-checked and built per the registry, committed through the Git data API with a verified signature, and opened as a pull request. There is no auto-merge; an admin reviews it in the session and either merges (after the dashboard revalidates the pull, its checks, and the file and line limits) or rejects it with a reason.
+5. The runner reports back over an HMAC-signed webhook. The dashboard also polls the Actions API as a fallback, and a GitHub webhook updates the run when the pull request is merged, closed, or reopened.
 
 ## Ownership
 
@@ -23,7 +23,7 @@ Sessions are owned. Only the owner with a project grant, or an admin, can read a
 
 ## Limits and audit
 
-`createRun` enforces 5 requests per user per day and 1 active run per project atomically. Every request, report, cancel, and delete writes to an `audit_events` table with triggers that reject updates and deletes.
+`createRun` enforces 5 requests per user per day and 1 active run per project atomically. Every request, report, cancel, delete, review action, and retry writes to an `audit_events` table with triggers that reject updates and deletes.
 
 ## Auth
 
