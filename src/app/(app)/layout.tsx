@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
   const sessions = await listSessionsForUser(user.id, user.allowedProjects);
   return (
-    <SessionsProvider sessions={sessions} showOwner={sessions.some((s) => s.owner_id !== user.id)}>
+    <SessionsProvider sessions={sessions} viewerId={user.id}>
       <div className="flex h-dvh overflow-hidden">
         <ThreadsSidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>

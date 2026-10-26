@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireSameOrigin } from "@/lib/csrf";
-import { appendAuditEvent, createSession } from "@/db";
+import { appendAuditEvent, createSession, listSessionsForUser } from "@/db";
 import { canAccessProject, requireUser } from "@/lib/user";
 import { projects } from "@/lib/projects";
+
+export async function GET() {
+  const user = await requireUser();
+  return NextResponse.json(await listSessionsForUser(user.id, user.allowedProjects));
+}
 
 export async function POST(req: Request) {
   try { requireSameOrigin(req); } catch { return NextResponse.json({ error: "cross-origin request blocked" }, { status: 403 }); }

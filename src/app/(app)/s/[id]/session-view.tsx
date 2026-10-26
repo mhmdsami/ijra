@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageSquarePlus, Trash2 } from "lucide-react";
+import { MessageSquarePlus, Trash2, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -37,9 +37,11 @@ export function SessionView({ initial }: { initial: State }) {
   const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({ text: "", tools: [], stage: "" });
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { sessions } = useSessions();
+  const { sessions, refresh } = useSessions();
   const refreshedSidebar = useRef(false);
+  const reviewSynced = useRef(false);
   const anyActive = state.runs.some((r) => ACTIVE.has(r.status));
+  const anyReview = state.runs.some((r) => r.status === "awaiting_review");
   const activeRun = state.runs.find((r) => ACTIVE.has(r.status));
   const dispatchAt = activeRun?.dispatch_at ?? 0;
   const latestRun = [...state.runs].reverse().find((r) => !ACTIVE.has(r.status) && (r.pr_url || r.status === "blocked"));
@@ -61,12 +63,22 @@ export function SessionView({ initial }: { initial: State }) {
   }, [initial.session.id]);
 
   useEffect(() => {
+    if (anyActive || !anyReview) {
+      reviewSynced.current = false;
+      return;
+    }
+    if (reviewSynced.current) return;
+    reviewSynced.current = true;
+    void poll();
+  }, [anyActive, anyReview, poll]);
+
+  useEffect(() => {
     if (refreshedSidebar.current) return;
     if (!sessions.some((s) => s.id === initial.session.id)) {
       refreshedSidebar.current = true;
-      router.refresh();
+      void refresh();
     }
-  }, [sessions, initial.session.id, router]);
+  }, [sessions, initial.session.id, refresh]);
 
   useEffect(() => {
     if (!anyActive) {
@@ -211,7 +223,7 @@ export function SessionView({ initial }: { initial: State }) {
 
       <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 sm:px-6">
         {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 sm:gap-7 sm:py-10">
+        <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 sm:gap-7 sm:py-10">
           {state.messages.length === 0 && (
             <EmptyState
               icon={MessageSquarePlus}
@@ -254,7 +266,7 @@ export function SessionView({ initial }: { initial: State }) {
                 </div>
               )}
               {live.text.length > 0 && (
-                <p className="max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">{live.text}</p>
+                <p className="scrollbar-thin max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">{live.text}</p>
               )}
             </div>
           )}
@@ -336,20 +348,31 @@ function Message({ role, content, meta, index }: { role: string; content: string
   } catch {
   }
   return (
-    <article className="animate-fade-up border-l border-border pl-4" style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
-      <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
-      {isUser ? (
-        <>
-          {imageIds.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
-            </div>
-          )}
-          <div className="text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
-        </>
-      ) : (
-        <Markdown text={content} />
-      )}
+    <article className="animate-fade-up flex gap-3" style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
+      <span
+        aria-hidden
+        className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-md border border-border",
+          isUser ? "bg-surface-2" : "bg-surface-1"
+        )}
+      >
+        {isUser ? <User className="size-3.5 text-text-secondary" /> : <Wordmark className="text-[10px] text-primary" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
+        {isUser ? (
+          <div className="w-fit max-w-full rounded-lg bg-surface-2 px-3 py-2.5">
+            {imageIds.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
+              </div>
+            )}
+            <div className="text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
+          </div>
+        ) : (
+          <Markdown text={content} />
+        )}
+      </div>
     </article>
   );
 }

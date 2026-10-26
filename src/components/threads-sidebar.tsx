@@ -56,7 +56,7 @@ export function ThreadsSidebar() {
           </button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {sessions.length === 0 ? (
           <EmptyState variant="inline" title="No threads yet" description="Your requests will appear here." />
         ) : (

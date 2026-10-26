@@ -5,9 +5,11 @@ import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { ComposerControls } from "@/components/composer-controls";
 import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
+import { useSessions } from "@/components/sessions-context";
 
 export function NewRequest({ projects, models, defaultModel }: { projects: string[]; models: { id: string; label: string; vision: boolean }[]; defaultModel: string }) {
   const router = useRouter();
+  const { refresh } = useSessions();
   const [project, setProject] = useState("");
   const [content, setContent] = useState("");
   const [model, setModel] = useState<string>(defaultModel);
@@ -45,7 +47,7 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
         return;
       }
       router.push(`/s/${id}`);
-      router.refresh();
+      void refresh();
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : "Could not send the request. Check your connection and try again.");
     } finally {
