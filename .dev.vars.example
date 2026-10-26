@@ -1,5 +1,6 @@
 # Local secrets for wrangler dev (never commit values)
 GITHUB_PAT=local-dev-placeholder
+GITHUB_WEBHOOK_SECRET=local-dev-placeholder
 
 # Set to 1 to bypass auth as the dev-local admin. Never set in production.
 LOCAL_PREVIEW=1

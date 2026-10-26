@@ -396,6 +396,7 @@ function PrCard({ run }: { run: RunRow | undefined }) {
   const label =
     run.status === "awaiting_review" ? "Awaiting review"
     : run.status === "merged" ? "Merged"
+    : run.status === "closed" ? "Closed"
     : run.status === "blocked" ? "Blocked"
     : run.status === "failed" ? "Failed"
     : run.status;

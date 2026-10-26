@@ -3,6 +3,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 export interface Env {
   DB: D1Database;
   GITHUB_PAT: string;
+  GITHUB_WEBHOOK_SECRET: string;
   IJRA_RUNNER_KEY: string;
   IJRA_SESSION_SECRET: string;
   BETTER_AUTH_SECRET: string;

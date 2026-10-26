@@ -8,5 +8,5 @@ export interface RunInput {
 export type RunState =
   | { status: "dispatching" | "running" }
   | { status: "done" | "awaiting_review"; prUrl: string | null; safeZone: boolean | null }
-  | { status: "merged"; prUrl: string }
+  | { status: "merged" | "closed"; prUrl: string }
   | { status: "cancelled" | "failed"; runUrl: string | null };

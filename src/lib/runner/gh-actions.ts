@@ -1,18 +1,20 @@
 import { env } from "../../env";
-import { updateRun } from "../../db";
+import { setRunStatus, updateRun } from "../../db";
 import { RUNNER_REPO, projectConfig } from "../projects";
+import { runStateFromPull } from "./pull-sync";
 import type { RunState } from "./types";
 
 type GHRun = { status: string; conclusion: string | null; html_url: string };
 type GHPull = {
   html_url: string;
   state: string;
-  merged: boolean;
+  merged?: boolean | null;
+  merged_at?: string | null;
   head: { ref: string };
   body: string | null;
 };
 
-export type SyncResult = RunState & { agentSummary: string | null };
+export type SyncResult = RunState & { agentSummary: string | null; changed: boolean };
 
 async function gh<T>(path: string, init?: RequestInit): Promise<T | null> {
   const res = await fetch(`https://api.github.com${path}`, {
@@ -72,47 +74,75 @@ export async function syncRun(run: {
   mode: "fix" | "ask" | "auto";
   ghRunId: number | null;
   dispatchAt: number;
+  branch: string | null;
 }): Promise<SyncResult> {
+  const cfg = projectConfig(run.project);
+
+  if (run.status === "awaiting_review") {
+    const pr = await findPr(cfg.repo, run.session, run.branch);
+    if (!pr) return { status: "awaiting_review", prUrl: null, safeZone: null, agentSummary: null, changed: false };
+    const state = runStateFromPull(pr);
+    const changed = state.status === "awaiting_review"
+      ? false
+      : await setRunStatus({
+          id: run.id,
+          from: ["awaiting_review"],
+          to: state.status,
+          prUrl: pr.html_url,
+          branch: pr.head.ref,
+          action: `run.${state.status}`,
+        });
+    return { ...state, agentSummary: agentSummaryFrom(pr.body ?? ""), changed };
+  }
+
   let ghRunId = run.ghRunId;
 
   if (!ghRunId) {
     const resolved = await resolveRunId(run.dispatchAt);
-    if (!resolved) return { status: "dispatching", agentSummary: null };
+    if (!resolved) return { status: "dispatching", agentSummary: null, changed: false };
     ghRunId = resolved.id;
     await updateRun(run.id, { gh_run_id: resolved.id, gh_run_url: resolved.html_url });
   }
 
   const ghRun = await gh<GHRun>(`/repos/${RUNNER_REPO}/actions/runs/${ghRunId}`);
-  if (!ghRun) return { status: "failed", runUrl: null, agentSummary: null };
+  if (!ghRun) {
+    const changed = await setRunStatus({ id: run.id, from: [run.status], to: "failed", runUrl: null, action: "run.failed" });
+    return { status: "failed", runUrl: null, agentSummary: null, changed };
+  }
 
   if (ghRun.status !== "completed") {
-    return { status: "running", agentSummary: null };
+    const changed = run.status === "dispatching"
+      ? await setRunStatus({ id: run.id, from: ["dispatching"], to: "running", action: "run.running" })
+      : false;
+    return { status: "running", agentSummary: null, changed };
   }
 
   if (ghRun.conclusion === "cancelled") {
-    await updateRun(run.id, { status: "cancelled", gh_run_url: ghRun.html_url });
-    return { status: "cancelled", runUrl: ghRun.html_url, agentSummary: null };
+    const changed = await setRunStatus({ id: run.id, from: [run.status], to: "cancelled", runUrl: ghRun.html_url, action: "run.cancelled" });
+    return { status: "cancelled", runUrl: ghRun.html_url, agentSummary: null, changed };
   }
 
   if (ghRun.conclusion !== "success") {
-    await updateRun(run.id, { status: "failed", gh_run_url: ghRun.html_url });
-    return { status: "failed", runUrl: ghRun.html_url, agentSummary: null };
+    const changed = await setRunStatus({ id: run.id, from: [run.status], to: "failed", runUrl: ghRun.html_url, action: "run.failed" });
+    return { status: "failed", runUrl: ghRun.html_url, agentSummary: null, changed };
   }
 
-  const cfg = projectConfig(run.project);
-  const pr = await findPr(cfg.repo, run.session);
+  const pr = await findPr(cfg.repo, run.session, run.branch);
   if (!pr) {
-    await updateRun(run.id, { status: "done" });
-    return { status: "done", prUrl: null, safeZone: null, agentSummary: null };
+    const changed = await setRunStatus({ id: run.id, from: [run.status], to: "done", action: "run.done" });
+    return { status: "done", prUrl: null, safeZone: null, agentSummary: null, changed };
   }
 
-  const state: RunState =
-    pr.state === "closed" && pr.merged
-      ? { status: "merged", prUrl: pr.html_url }
-      : { status: "awaiting_review", prUrl: pr.html_url, safeZone: null };
-
-  await updateRun(run.id, { status: state.status, pr_url: pr.html_url, branch: pr.head.ref });
-  return { ...state, agentSummary: agentSummaryFrom(pr.body ?? "") };
+  const state = runStateFromPull(pr);
+  const changed = await setRunStatus({
+    id: run.id,
+    from: [run.status],
+    to: state.status,
+    prUrl: pr.html_url,
+    branch: pr.head.ref,
+    action: `run.${state.status}`,
+  });
+  return { ...state, agentSummary: agentSummaryFrom(pr.body ?? ""), changed };
 }
 
 async function resolveRunId(dispatchAt: number) {
@@ -125,7 +155,12 @@ async function resolveRunId(dispatchAt: number) {
   return match ? { id: match.id, html_url: match.html_url } : null;
 }
 
-async function findPr(repo: string, session: string) {
+async function findPr(repo: string, session: string, branch: string | null) {
+  if (branch) {
+    const owner = repo.split("/")[0];
+    const pulls = await gh<GHPull[]>(`/repos/${repo}/pulls?state=all&head=${encodeURIComponent(`${owner}:${branch}`)}&per_page=1`);
+    if (pulls?.length) return pulls[0];
+  }
   const pulls = await gh<GHPull[]>(`/repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=15`);
   return pulls?.find((p) => new RegExp(`^(ft|fx|ch|rf)-${session}-`).test(p.head.ref)) ?? null;
 }

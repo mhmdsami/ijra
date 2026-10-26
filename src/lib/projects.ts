@@ -19,3 +19,8 @@ export function projectConfig(id: string) {
   if (!cfg) throw new Error(`Unknown project: ${id}`);
   return cfg;
 }
+
+export function projectForRepo(repo: string) {
+  const target = repo.toLowerCase();
+  return projects().find(({ cfg }) => cfg.repo.toLowerCase() === target) ?? null;
+}

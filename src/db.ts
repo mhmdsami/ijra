@@ -416,10 +416,49 @@ export async function updateRun(id: string, fields: Partial<RunRow>) {
     .run();
 }
 
+export async function touchRun(id: string) {
+  await env().DB.prepare("UPDATE runs SET updated_at = ? WHERE id = ?").bind(now(), id).run();
+}
+
+export async function setRunStatus(input: {
+  id: string;
+  from: readonly string[];
+  to: string;
+  action: string;
+  prUrl?: string | null;
+  branch?: string | null;
+  runUrl?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  if (input.from.length === 0) return false;
+  const sets = ["status = ?", "updated_at = ?"];
+  const values: (string | number | null)[] = [input.to, now()];
+  if (input.prUrl !== undefined) { sets.push("pr_url = ?"); values.push(input.prUrl); }
+  if (input.branch !== undefined) { sets.push("branch = ?"); values.push(input.branch); }
+  if (input.runUrl !== undefined) { sets.push("gh_run_url = ?"); values.push(input.runUrl); }
+  const placeholders = input.from.map(() => "?").join(", ");
+  const { results } = await env().DB.prepare(
+    `UPDATE runs SET ${sets.join(", ")} WHERE id = ? AND status IN (${placeholders}) RETURNING session_id`
+  )
+    .bind(...values, input.id, ...input.from)
+    .all<{ session_id: string }>();
+  const updated = results?.[0];
+  if (!updated) return false;
+  await appendAuditEvent({
+    sessionId: updated.session_id,
+    runId: input.id,
+    action: input.action,
+    metadata: { ...input.metadata, to: input.to },
+  });
+  return true;
+}
+
 const allowedRunTransitions: Record<string, readonly string[]> = {
   dispatching: ["running", "done", "failed", "cancelled"],
   running: ["done", "merged", "failed", "cancelled"],
   done: ["merged"],
+  awaiting_review: ["merged", "closed"],
+  closed: ["awaiting_review"],
 };
 
 export async function transitionRun(input: {
@@ -446,6 +485,12 @@ export async function transitionRun(input: {
 
 export async function getRun(id: string) {
   return env().DB.prepare("SELECT * FROM runs WHERE id = ?").bind(id).first<RunRow>();
+}
+
+export async function findRunByBranch(project: string, branch: string) {
+  return env().DB.prepare("SELECT * FROM runs WHERE project = ? AND branch = ? ORDER BY dispatch_at DESC LIMIT 1")
+    .bind(project, branch)
+    .first<RunRow>();
 }
 
 export async function getRuns(sessionId: string) {

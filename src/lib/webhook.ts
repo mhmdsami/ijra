@@ -1,13 +1,8 @@
 import { env } from "@/env";
+import { hmacHex } from "./github-signature";
 
 const MAX_AGE_MS = 5 * 60_000;
 const secretLike = /(?:token|secret|password|authorization|cookie|api[_-]?key|private[_-]?key)\s*[=:]\s*\S+/gi;
-
-async function hmacHex(payload: string, key: string) {
-  const cryptoKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(key), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(payload));
-  return [...new Uint8Array(signature)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 
 export async function validSignature(body: string, timestamp: string, signature: string) {
   if (!/^\d+$/.test(timestamp) || Math.abs(Date.now() - Number(timestamp)) > MAX_AGE_MS) return false;
