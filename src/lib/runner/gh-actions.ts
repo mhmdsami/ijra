@@ -161,13 +161,14 @@ async function findPr(repo: string, session: string, branch: string | null) {
     const pulls = await gh<GHPull[]>(`/repos/${repo}/pulls?state=all&head=${encodeURIComponent(`${owner}:${branch}`)}&per_page=1`);
     if (pulls?.length) return pulls[0];
   }
+  const shortSession = session.slice(0, 8);
+  if (!shortSession) return null;
   const pulls = await gh<GHPull[]>(`/repos/${repo}/pulls?state=all&sort=created&direction=desc&per_page=15`);
-  return pulls?.find((p) => new RegExp(`^(ft|fx|ch|rf)-${session}-`).test(p.head.ref)) ?? null;
+  return pulls?.find((p) => p.head.ref.includes(shortSession)) ?? null;
 }
 
 function agentSummaryFrom(body: string) {
-  const table = body.indexOf("\n| | |");
-  const footer = body.indexOf("Automated by");
-  const stop = [table, footer].filter((i) => i !== -1).sort((a, b) => a - b)[0];
-  return (stop === undefined ? body : body.slice(0, stop)).trim() || null;
+  const stops = [body.indexOf("\n\n---\nSession:"), body.indexOf("\n| | |")].filter((index) => index !== -1);
+  const stop = stops.length ? Math.min(...stops) : -1;
+  return (stop === -1 ? body : body.slice(0, stop)).trim() || null;
 }

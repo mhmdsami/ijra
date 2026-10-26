@@ -151,7 +151,14 @@ function buildPrompt(cfg, request, mode) {
 - When you made changes, end your reply with the PR metadata in this exact format:
   Title: <type>: <imperative summary, max 50 chars; type is one of feat, fix, chore, refactor, docs; e.g. "fix: limit fleet grid to three columns">
   ## PR description
-  <markdown describing what changed, why, and how it was verified — this becomes the PR body>
+  ## Summary
+  <one or two sentences describing what changed and why>
+  ## Changes
+  - <specific change>
+  ## Verification
+  - <command or check you ran and its result>
+  ## Risks
+  - <risk, or "None">
 - When you changed nothing, reply plainly; this reply is delivered as chat.`;
   return [
     ask
@@ -352,6 +359,7 @@ const {
   APP_PRIVATE_KEY,
   GITHUB_OUTPUT = "",
   GITHUB_STEP_SUMMARY = "",
+  IJRA_APP_URL = "",
   IJRA_WEBHOOK_URL = "",
   IJRA_PROGRESS_URL = "",
   IJRA_RUNNER_KEY = "",
@@ -539,7 +547,7 @@ try {
   const type = conv && TYPE_BRANCH[conv[1].toLowerCase()] ? conv[1].toLowerCase() : "chore";
   const subject = (conv ? conv[2] : rawTitle).trim().replace(/[.!]+$/, "").slice(0, 50);
   const title = `${type}: ${subject}`;
-  const branch = `${TYPE_BRANCH[type]}-${session}-${slug(REQUEST)}`;
+  const branch = `${TYPE_BRANCH[type]}-${session.slice(0, 8)}-${slug(subject)}`;
   outcome.branch = branch;
   const description = titleMatch
     ? agentSummary
@@ -589,19 +597,14 @@ try {
   });
   await api("/git/refs", { method: "POST", body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: commit.sha }) });
 
+  const appUrl = (IJRA_APP_URL || IJRA_WEBHOOK_URL.replace(/\/api\/internal\/answer$/, "")).replace(/\/$/, "");
+  const sessionUrl = appUrl && session ? `${appUrl}/s/${session}` : "";
   const body = [
     description,
     "",
-    `| | |`,
-    `|---|---|`,
-    `| Session | \`${session}\` |`,
-    `| Model | \`${model}\` |`,
-    `| Files | ${committed.length} |`,
-    `| Verify | ${Object.entries(outcome.verify).map(([k, v]) => `${k}: ${v}`).join(", ") || "n/a"} |`,
-    `| Safe zone | ${outcome.safeZone ? "yes" : "**no — needs review**"} |`,
-    "",
-    `Automated by ijra.`,
-  ].join("\n");
+    "---",
+    sessionUrl ? `Session: ${sessionUrl}` : session ? `Session: \`${session}\`` : "",
+  ].filter((line, index) => line !== "" || index < 2).join("\n");
   writeFileSync("../pr-body.md", body);
   sh(`gh pr create --repo ${cfg.repo} --head ${branch} --title ${shq(title)} --body-file ../pr-body.md`, "pr", { env: { ...cleanEnv, GH_TOKEN } });
   const prUrl = sh(`gh pr view ${shq(branch)} --repo ${cfg.repo} --json url -q .url`, "pr-url", { env: { ...cleanEnv, GH_TOKEN } }).stdout.trim();
