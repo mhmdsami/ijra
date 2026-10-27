@@ -3,25 +3,24 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth-server";
 import {
-  DEFAULT_DAILY_LIMIT,
   addModel as addModelRow,
-  removeModel as removeModelRow,
-  setDefaultModel as setDefaultModelRow,
   deleteUserRow,
   getSuperAdminId,
   getUserLimit,
   getUserProjects,
   listUsers,
+  removeModel as removeModelRow,
   removeUserLimit,
   removeUserProject,
+  setDefaultModel as setDefaultModelRow,
   setUserLimit,
   setUserProject,
 } from "@/db";
-import { requireUser } from "@/lib/user";
-import { projects } from "@/lib/projects";
+import { auth } from "@/lib/auth-server";
 import { availableModel } from "@/lib/model-catalog";
+import { projects } from "@/lib/projects";
+import { requireUser } from "@/lib/user";
 
 export async function saveAccessAction(formData: FormData) {
   const admin = await requireUser();
@@ -82,7 +81,9 @@ export async function guardAdmin() {
 
 export async function usersWithGrants() {
   const users = await listUsers();
-  return Promise.all(users.map(async (u) => ({ ...u, projects: await getUserProjects(u.id), limit: await getUserLimit(u.id) })));
+  return Promise.all(
+    users.map(async (u) => ({ ...u, projects: await getUserProjects(u.id), limit: await getUserLimit(u.id) })),
+  );
 }
 
 export async function addModelAction(formData: FormData) {

@@ -2,17 +2,24 @@ import { spawn } from "node:child_process";
 
 const port = process.env.SMOKE_PORT ?? "3123";
 const base = `http://localhost:${port}`;
-const server = spawn("npx", ["next", "dev", "--port", port], { cwd: process.cwd(), detached: true, stdio: ["ignore", "pipe", "pipe"] });
+const server = spawn("npx", ["next", "dev", "--port", port], {
+  cwd: process.cwd(),
+  detached: true,
+  stdio: ["ignore", "pipe", "pipe"],
+});
 
 let logs = "";
-server.stdout.on("data", (chunk) => { logs += chunk; });
-server.stderr.on("data", (chunk) => { logs += chunk; });
+server.stdout.on("data", (chunk) => {
+  logs += chunk;
+});
+server.stderr.on("data", (chunk) => {
+  logs += chunk;
+});
 
 function stop() {
   try {
     process.kill(-server.pid, "SIGTERM");
-  } catch {
-  }
+  } catch {}
 }
 
 async function waitForServer(timeoutMs = 90_000) {

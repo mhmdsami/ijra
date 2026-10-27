@@ -1,15 +1,19 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { availableModel, modelCatalog, resetModelCatalogCache } from "./model-catalog.ts";
 
 test("catalog status controls enablement without a model denylist", async (t) => {
   resetModelCatalogCache();
-  t.mock.method(globalThis, "fetch", async () => Response.json({
-    "opencode-go": { models: {
-      "retired-example": { name: "Retired example", status: "deprecated" },
-      "active-example": { name: "Active example", modalities: { input: ["text", "image"] } },
-    } },
-  }));
+  t.mock.method(globalThis, "fetch", async () =>
+    Response.json({
+      "opencode-go": {
+        models: {
+          "retired-example": { name: "Retired example", status: "deprecated" },
+          "active-example": { name: "Active example", modalities: { input: ["text", "image"] } },
+        },
+      },
+    }),
+  );
   const models = await modelCatalog();
   assert.equal(models.find((m) => m.id === "retired-example")?.deprecated, true);
   assert.equal((await availableModel("active-example")).vision, true);

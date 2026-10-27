@@ -1,6 +1,6 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
+import { test } from "node:test";
 import { PRUNE_CALLBACKS_SQL, RECORD_CALLBACK_SQL, REPLAY_TTL_MS } from "./replay.ts";
 
 function openDatabase() {

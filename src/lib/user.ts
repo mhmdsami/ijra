@@ -1,11 +1,11 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { auth } from "./auth-server";
 import { adminCount, getUserProjects, promoteToAdmin } from "@/db";
-import { projects } from "./projects";
-import { isLocalPreview } from "./local-preview";
 import { canAccessProject, canAccessSession, canReviewRun, canWriteProject } from "./access";
+import { auth } from "./auth-server";
+import { isLocalPreview } from "./local-preview";
+import { projects } from "./projects";
 
 export { canAccessProject, canAccessSession, canReviewRun, canWriteProject };
 
@@ -20,7 +20,14 @@ export interface CurrentUser {
 
 export const requireUser = cache(async (): Promise<CurrentUser> => {
   if (isLocalPreview()) {
-    return { id: "dev-local", email: "dev@localhost", name: "Local", isAdmin: true, allowedProjects: null, writeProjects: null };
+    return {
+      id: "dev-local",
+      email: "dev@localhost",
+      name: "Local",
+      isAdmin: true,
+      allowedProjects: null,
+      writeProjects: null,
+    };
   }
   const session = await auth().api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/login");

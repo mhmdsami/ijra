@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
+import { SessionsProvider } from "@/components/sessions-context";
+import { ThreadsSidebar } from "@/components/threads-sidebar";
 import { listSessionsForUser } from "@/db";
 import { requireUser } from "@/lib/user";
-import { ThreadsSidebar } from "@/components/threads-sidebar";
-import { SessionsProvider } from "@/components/sessions-context";
 
 export const dynamic = "force-dynamic";
 

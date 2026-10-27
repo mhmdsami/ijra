@@ -6,7 +6,9 @@ const KINDS = new Set(["stage", "text", "tool"]);
 
 export async function POST(req: Request) {
   const body = await req.text();
-  if (!(await validSignature(body, req.headers.get("x-ijra-timestamp") ?? "", req.headers.get("x-ijra-signature") ?? ""))) {
+  if (
+    !(await validSignature(body, req.headers.get("x-ijra-timestamp") ?? "", req.headers.get("x-ijra-signature") ?? ""))
+  ) {
     return NextResponse.json({ error: "invalid runner signature" }, { status: 401 });
   }
 
@@ -28,7 +30,9 @@ export async function POST(req: Request) {
     if (typeof event?.seq !== "number" || !Number.isInteger(event.seq)) return [];
     if (typeof event.kind !== "string" || !KINDS.has(event.kind)) return [];
     if (typeof event.text !== "string" || event.text.length === 0) return [];
-    return [{ seq: event.seq, kind: event.kind as "stage" | "text" | "tool", text: redactText(event.text).slice(0, 4000) }];
+    return [
+      { seq: event.seq, kind: event.kind as "stage" | "text" | "tool", text: redactText(event.text).slice(0, 4000) },
+    ];
   });
 
   await appendProgress(run.id, clean);

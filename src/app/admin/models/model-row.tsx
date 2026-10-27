@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { addModelAction, removeModelAction, setDefaultModelAction } from "../actions";
 import { cn } from "@/lib/utils";
+import { addModelAction, removeModelAction, setDefaultModelAction } from "../actions";
 
 function lastUsed(ts: number | null | undefined, now: number) {
   if (!ts) return "never used";
@@ -38,7 +38,12 @@ export function ModelRow({
   }
 
   return (
-    <div className={cn("flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5", pending && "opacity-50")}>
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2.5",
+        pending && "opacity-50",
+      )}
+    >
       <div className="min-w-0">
         <div className="truncate text-sm text-foreground">{model.label}</div>
         <div className="truncate font-mono text-2xs text-text-tertiary">
@@ -47,8 +52,15 @@ export function ModelRow({
           {model.isDefault && " · default"}
           {stale ? " · not in catalog" : model.unavailable && " · unavailable"}
           {" · "}
-          {usage ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last, now ?? 0)}` : lastUsed(null, now ?? 0)}
+          {usage
+            ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last, now ?? 0)}`
+            : lastUsed(null, now ?? 0)}
         </div>
+        {actionError && (
+          <p role="alert" className="mt-1 text-2xs text-destructive">
+            {actionError}
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         {model.enabled ? (

@@ -1,10 +1,13 @@
 export type ModelCatalogResponse = {
   "opencode-go"?: {
-    models?: Record<string, {
-      name?: string;
-      status?: string;
-      modalities?: { input?: string[] };
-    }>;
+    models?: Record<
+      string,
+      {
+        name?: string;
+        status?: string;
+        modalities?: { input?: string[] };
+      }
+    >;
   };
 };
 
@@ -39,6 +42,4 @@ export type ProgressRow = ProgressEvent & {
   created_at: number;
 };
 
-export type StreamEvent =
-  | { type: "stage" | "text" | "tool"; text: string }
-  | { type: "done" | "reconnect" };
+export type StreamEvent = { type: "stage" | "text" | "tool"; text: string } | { type: "done" | "reconnect" };

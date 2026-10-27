@@ -3,7 +3,6 @@
 import { ImagePlus, X } from "lucide-react";
 import { useRef, useState } from "react";
 
-
 export type PendingImage = { key: string; mime: string; width: number; height: number; data: string };
 
 import { MAX_IMAGES_PER_MESSAGE, splitDataUrl } from "@/lib/images";
@@ -84,7 +83,11 @@ export function AttachmentTray({ images, onRemove }: { images: PendingImage[]; o
     <div className="flex flex-wrap gap-2 pb-2">
       {images.map((image) => (
         <span key={image.key} className="group relative">
-          <img src={`data:${image.mime};base64,${image.data}`} alt="" className="size-14 rounded-md border object-cover" />
+          <img
+            src={`data:${image.mime};base64,${image.data}`}
+            alt=""
+            className="size-14 rounded-md border object-cover"
+          />
           <button
             type="button"
             onClick={() => onRemove(image.key)}

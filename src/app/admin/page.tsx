@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { guardAdmin, usersWithGrants } from "./actions";
-import { UserList } from "./user-list";
-import { DEFAULT_DAILY_LIMIT, getSuperAdminId } from "@/db";
+import Link from "next/link";
+import { AdminNav } from "@/components/admin-nav";
+import { DEFAULT_DAILY_LIMIT } from "@/db";
 import { projects } from "@/lib/projects";
 import { HeaderActions } from "../header-actions";
-import { AdminNav } from "@/components/admin-nav";
+import { guardAdmin, usersWithGrants } from "./actions";
+import { UserList } from "./user-list";
 
 export const dynamic = "force-dynamic";
 const ALL_PROJECTS = projects().map((project) => project.id);
@@ -17,7 +17,10 @@ export default async function AdminPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-        <Link href="/" className="group flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+        <Link
+          href="/"
+          className="group flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
           <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
           <span className="type-display text-2xl leading-none text-foreground">ijra</span>
         </Link>
@@ -31,7 +34,8 @@ export default async function AdminPage() {
         <div className="mb-1">
           <h1 className="text-xl font-medium tracking-[-0.01em] text-foreground">Access</h1>
           <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-            Admins see everything. Others get per-project access: <b className="font-medium text-foreground">ask</b> is questions only, <b className="font-medium text-foreground">write</b> lets the agent open pull requests.
+            Admins see everything. Others get per-project access: <b className="font-medium text-foreground">ask</b> is
+            questions only, <b className="font-medium text-foreground">write</b> lets the agent open pull requests.
           </p>
         </div>
 

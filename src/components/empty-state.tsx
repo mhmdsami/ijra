@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export function EmptyState({
@@ -35,7 +35,9 @@ export function EmptyState({
         </span>
       )}
       <p className="type-display text-2xl leading-tight">{title}</p>
-      {description && <p className="mt-2 max-w-sm text-sm leading-6 text-pretty text-muted-foreground">{description}</p>}
+      {description && (
+        <p className="mt-2 max-w-sm text-sm leading-6 text-pretty text-muted-foreground">{description}</p>
+      )}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );

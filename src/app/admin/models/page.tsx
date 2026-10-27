@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { guardAdmin } from "../actions";
-import { listModels, modelUsage } from "@/db";
-import { HeaderActions } from "../../header-actions";
+import Link from "next/link";
 import { AdminNav } from "@/components/admin-nav";
-import { ModelCatalog, type CatalogItem } from "./model-catalog";
-
+import { listModels, modelUsage } from "@/db";
 import { modelCatalog } from "@/lib/model-catalog";
+import { HeaderActions } from "../../header-actions";
+import { guardAdmin } from "../actions";
+import { type CatalogItem, ModelCatalog } from "./model-catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -19,18 +18,43 @@ export default async function ModelsPage() {
 
   const enabledItems: CatalogItem[] = enabled
     .filter((m) => listing.some((c) => c.id === m.id))
-    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true, unavailable: listing.find((c) => c.id === m.id)?.deprecated }));
+    .map((m) => ({
+      id: m.id,
+      label: m.label,
+      vision: m.vision === 1,
+      isDefault: m.id === defaultId,
+      enabled: true,
+      unavailable: listing.find((c) => c.id === m.id)?.deprecated,
+    }));
   const missing: CatalogItem[] = enabled
     .filter((m) => !listing.some((c) => c.id === m.id))
-    .map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, isDefault: m.id === defaultId, enabled: true, stale: catalog !== null, unavailable: true }));
+    .map((m) => ({
+      id: m.id,
+      label: m.label,
+      vision: m.vision === 1,
+      isDefault: m.id === defaultId,
+      enabled: true,
+      stale: catalog !== null,
+      unavailable: true,
+    }));
   const available: CatalogItem[] = listing
     .filter((m) => !enabledIds.has(m.id))
-    .map((m) => ({ id: m.id, label: m.name, vision: m.vision, isDefault: false, enabled: false, unavailable: m.deprecated }));
+    .map((m) => ({
+      id: m.id,
+      label: m.name,
+      vision: m.vision,
+      isDefault: false,
+      enabled: false,
+      unavailable: m.deprecated,
+    }));
 
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 sm:px-6">
-        <Link href="/" className="group flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground">
+        <Link
+          href="/"
+          className="group flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
           <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-0.5" />
           <span className="type-display text-2xl leading-none text-foreground">ijra</span>
         </Link>
@@ -49,7 +73,9 @@ export default async function ModelsPage() {
         </div>
 
         {catalog === null && (
-          <p className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">Could not reach the model catalog. Try again shortly.</p>
+          <p className="rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+            Could not reach the model catalog. Try again shortly.
+          </p>
         )}
 
         <ModelCatalog enabled={enabledItems} available={available} missing={missing} usage={usage} />

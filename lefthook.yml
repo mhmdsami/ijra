@@ -1,4 +1,9 @@
 pre-commit:
   commands:
+    lint:
+      run: npx biome check --staged --no-errors-on-unmatched
+
+pre-push:
+  commands:
     gate:
       run: npm run gate

@@ -39,7 +39,9 @@ const FAILING_CONCLUSIONS = new Set(["failure", "timed_out", "cancelled", "actio
 
 export function checkState(checks: CheckSummary) {
   const pending = checks.checkRuns.filter((run) => run.status !== "completed").length;
-  const failing = checks.checkRuns.filter((run) => run.status === "completed" && FAILING_CONCLUSIONS.has(run.conclusion ?? "")).length;
+  const failing = checks.checkRuns.filter(
+    (run) => run.status === "completed" && FAILING_CONCLUSIONS.has(run.conclusion ?? ""),
+  ).length;
   const combined = checks.combinedCount === undefined || checks.combinedCount > 0;
   const combinedFailing = combined && (checks.combinedState === "failure" || checks.combinedState === "error") ? 1 : 0;
   const combinedPending = combined && checks.combinedState === "pending" ? 1 : 0;

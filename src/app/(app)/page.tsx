@@ -1,13 +1,13 @@
-import { getDefaultModel, listModels } from "@/db";
-import { requireUser } from "@/lib/user";
-import { projects } from "@/lib/projects";
 import { FolderLock } from "lucide-react";
+import Link from "next/link";
+import { HeaderActions } from "@/app/header-actions";
 import { EmptyState } from "@/components/empty-state";
 import { MobileThreads } from "@/components/mobile-threads";
 import { Wordmark } from "@/components/wordmark";
+import { getDefaultModel, listModels } from "@/db";
+import { projects } from "@/lib/projects";
+import { requireUser } from "@/lib/user";
 import { NewRequest } from "./new-request";
-import { HeaderActions } from "@/app/header-actions";
-import Link from "next/link";
 
 export default async function Home() {
   const user = await requireUser();

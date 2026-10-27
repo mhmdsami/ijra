@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DEFAULT_DAILY_LIMIT, countRunsForUserSince, getUserLimit } from "@/db";
+import { countRunsForUserSince, DEFAULT_DAILY_LIMIT, getUserLimit } from "@/db";
 import { requireUser } from "@/lib/user";
 
 export async function GET() {

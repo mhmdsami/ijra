@@ -27,7 +27,10 @@ export function parseRunnerReport(payload: unknown): RunnerReport | null {
     runId: value.runId,
     status: value.status,
     summary: typeof value.summary === "string" ? value.summary : undefined,
-    outcome: outcome && typeof outcome === "object" && !Array.isArray(outcome) ? (outcome as RunnerReport["outcome"]) : undefined,
+    outcome:
+      outcome && typeof outcome === "object" && !Array.isArray(outcome)
+        ? (outcome as RunnerReport["outcome"])
+        : undefined,
   };
 }
 

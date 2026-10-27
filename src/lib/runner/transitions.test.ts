@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { canRetry, canTransition } from "./transitions.ts";
 
 test("awaiting review can be merged or rejected", () => {

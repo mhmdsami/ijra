@@ -45,9 +45,11 @@ npm run preview
 | `npm run db:local` | apply D1 migrations locally |
 | `npm run db:remote` | apply D1 migrations remotely |
 | `npm run types` | `tsc --noEmit` |
+| `npm run lint` | `biome check .` |
+| `npm run format` | `biome format --write .` |
 | `npm test` | node test runner |
 | `npm run smoke` | start a dev server on port 3123 and check `/` and `/login` |
-| `npm run gate` | types, tests, build, smoke |
+| `npm run gate` | types, lint, tests, build, smoke |
 
 The smoke test needs `.dev.vars` and a migrated local D1 database.
 

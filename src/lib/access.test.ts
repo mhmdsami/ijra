@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { canAccessSession, canReviewRun, canWriteProject } from "./access.ts";
 
 const admin = { id: "admin", isAdmin: true, allowedProjects: null, writeProjects: null };

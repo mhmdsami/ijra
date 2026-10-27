@@ -1,5 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
+import { type NextRequest, NextResponse } from "next/server";
 import { isLocalPreview } from "@/lib/local-preview";
 
 export function middleware(req: NextRequest) {

@@ -2,12 +2,20 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Textarea } from "@/components/ui/textarea";
 import { ComposerControls } from "@/components/composer-controls";
-import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
+import { AttachButton, AttachmentTray, uploadImages, useImageQueue } from "@/components/image-attachments";
 import { useSessions } from "@/components/sessions-context";
+import { Textarea } from "@/components/ui/textarea";
 
-export function NewRequest({ projects, models, defaultModel }: { projects: string[]; models: { id: string; label: string; vision: boolean }[]; defaultModel: string }) {
+export function NewRequest({
+  projects,
+  models,
+  defaultModel,
+}: {
+  projects: string[];
+  models: { id: string; label: string; vision: boolean }[];
+  defaultModel: string;
+}) {
   const router = useRouter();
   const { refresh } = useSessions();
   const [project, setProject] = useState("");
@@ -49,7 +57,11 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
       router.push(`/s/${id}`);
       void refresh();
     } catch (e) {
-      setError(e instanceof Error && e.message ? e.message : "Could not send the request. Check your connection and try again.");
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : "Could not send the request. Check your connection and try again.",
+      );
     } finally {
       setBusy(false);
     }
@@ -58,7 +70,10 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
   return (
     <div className="rounded-xl border bg-card p-3 shadow-card sm:p-4">
       {error && (
-        <p role="alert" className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <p
+          role="alert"
+          className="mb-3 rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive"
+        >
           {error}
         </p>
       )}
@@ -67,11 +82,20 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
         value={content}
         onChange={(event) => setContent(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); create(); }
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            create();
+          }
         }}
         onPaste={(event) => {
-          const files = [...event.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
-          if (files.length > 0 && modelSupportsImages) { event.preventDefault(); imageQueue.add(files); }
+          const files = [...event.clipboardData.items]
+            .filter((item) => item.kind === "file")
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => !!file);
+          if (files.length > 0 && modelSupportsImages) {
+            event.preventDefault();
+            imageQueue.add(files);
+          }
         }}
         placeholder="Tell ijra what to fix"
         rows={3}
@@ -79,16 +103,26 @@ export function NewRequest({ projects, models, defaultModel }: { projects: strin
       />
       <div className="mt-3 flex items-center gap-3 border-t pt-3 max-[380px]:flex-col max-[380px]:items-stretch max-[380px]:gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={busy || imageQueue.images.length >= 3} />}
-          <label className="sr-only" htmlFor="project">Project</label>
+          {modelSupportsImages && (
+            <AttachButton onFiles={imageQueue.add} disabled={busy || imageQueue.images.length >= 3} />
+          )}
+          <label className="sr-only" htmlFor="project">
+            Project
+          </label>
           <select
             id="project"
             value={project}
             onChange={(event) => setProject(event.target.value)}
             className="min-w-0 flex-1 truncate bg-transparent text-xs text-muted-foreground outline-none transition-colors appearance-none hover:text-foreground sm:max-w-[40%] sm:flex-none"
           >
-            <option value="" disabled>Choose a project</option>
-            {projects.map((id) => <option key={id} value={id}>{id}</option>)}
+            <option value="" disabled>
+              Choose a project
+            </option>
+            {projects.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
           </select>
         </div>
         <div className="flex shrink-0 justify-end max-[380px]:w-full">

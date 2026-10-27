@@ -1,6 +1,6 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkOutcome, checkState, pullNumberFrom, reviewMerge, type ReviewInput } from "./review.ts";
+import { test } from "node:test";
+import { checkOutcome, checkState, pullNumberFrom, type ReviewInput, reviewMerge } from "./review.ts";
 
 function input(overrides: Partial<ReviewInput> = {}): ReviewInput {
   return {
@@ -20,18 +20,24 @@ test("accepts an open, green, in-budget pull request", () => {
 });
 
 test("blocks a pull that is not open", () => {
-  const result = reviewMerge(input({ pull: { state: "closed", merged: false, changed_files: 1, head: { sha: "abc" } } }));
+  const result = reviewMerge(
+    input({ pull: { state: "closed", merged: false, changed_files: 1, head: { sha: "abc" } } }),
+  );
   assert.equal(result.ok, false);
   assert.match(result.reasons.join("; "), /not open/);
 });
 
 test("blocks an already-merged pull", () => {
-  const result = reviewMerge(input({ pull: { state: "closed", merged: true, changed_files: 1, head: { sha: "abc" } } }));
+  const result = reviewMerge(
+    input({ pull: { state: "closed", merged: true, changed_files: 1, head: { sha: "abc" } } }),
+  );
   assert.match(result.reasons.join("; "), /already merged/);
 });
 
 test("blocks a conflicting pull", () => {
-  const result = reviewMerge(input({ pull: { state: "open", merged: false, mergeable: false, changed_files: 1, head: { sha: "abc" } } }));
+  const result = reviewMerge(
+    input({ pull: { state: "open", merged: false, mergeable: false, changed_files: 1, head: { sha: "abc" } } }),
+  );
   assert.match(result.reasons.join("; "), /conflicts/);
 });
 
@@ -40,12 +46,16 @@ test("blocks a policy-blocked run", () => {
 });
 
 test("blocks while checks are running", () => {
-  const result = reviewMerge(input({ checks: { checkRuns: [{ status: "in_progress", conclusion: null }], combinedState: null } }));
+  const result = reviewMerge(
+    input({ checks: { checkRuns: [{ status: "in_progress", conclusion: null }], combinedState: null } }),
+  );
   assert.match(result.reasons.join("; "), /still running/);
 });
 
 test("blocks a failing check run", () => {
-  const result = reviewMerge(input({ checks: { checkRuns: [{ status: "completed", conclusion: "failure" }], combinedState: null } }));
+  const result = reviewMerge(
+    input({ checks: { checkRuns: [{ status: "completed", conclusion: "failure" }], combinedState: null } }),
+  );
   assert.match(result.reasons.join("; "), /1 check failing/);
 });
 
@@ -60,7 +70,9 @@ test("ignores an empty combined status instead of blocking forever", () => {
 });
 
 test("blocks more than twelve changed files", () => {
-  const result = reviewMerge(input({ pull: { state: "open", merged: false, changed_files: 13, head: { sha: "abc" } } }));
+  const result = reviewMerge(
+    input({ pull: { state: "open", merged: false, changed_files: 13, head: { sha: "abc" } } }),
+  );
   assert.match(result.reasons.join("; "), /13 files changed/);
 });
 
@@ -79,7 +91,7 @@ test("counts pending and failing checks together", () => {
       ],
       combinedState: "pending",
     }),
-    { total: 3, pending: 2, failing: 1 }
+    { total: 3, pending: 2, failing: 1 },
   );
 });
 
@@ -92,8 +104,17 @@ test("extracts the pull number from a PR URL", () => {
 
 test("summarises check state for the card", () => {
   assert.equal(checkOutcome({ checkRuns: [], combinedState: "pending", combinedCount: 0 }), "none");
-  assert.equal(checkOutcome({ checkRuns: [{ status: "completed", conclusion: "success" }], combinedState: "success" }), "passing");
+  assert.equal(
+    checkOutcome({ checkRuns: [{ status: "completed", conclusion: "success" }], combinedState: "success" }),
+    "passing",
+  );
   assert.equal(checkOutcome({ checkRuns: [], combinedState: "success", combinedCount: 1 }), "passing");
-  assert.equal(checkOutcome({ checkRuns: [{ status: "completed", conclusion: "failure" }], combinedState: null }), "failing");
-  assert.equal(checkOutcome({ checkRuns: [{ status: "in_progress", conclusion: null }], combinedState: null }), "pending");
+  assert.equal(
+    checkOutcome({ checkRuns: [{ status: "completed", conclusion: "failure" }], combinedState: null }),
+    "failing",
+  );
+  assert.equal(
+    checkOutcome({ checkRuns: [{ status: "in_progress", conclusion: null }], combinedState: null }),
+    "pending",
+  );
 });

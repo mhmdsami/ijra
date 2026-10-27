@@ -1,6 +1,6 @@
+import { notFound } from "next/navigation";
 import { getDefaultModel, getMessages, getOwnerEmail, getRuns, getSession, listModels } from "@/db";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
-import { notFound } from "next/navigation";
 import { SessionView } from "./session-view";
 
 export default async function SessionPage({ params }: { params: Promise<{ id: string }> }) {

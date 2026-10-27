@@ -1,9 +1,9 @@
 "use client";
 
-import { authClient } from "@/lib/auth-client";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState } from "react";
+import { authClient } from "@/lib/auth-client";
 
 export function GoogleSignIn() {
   const [busy, setBusy] = useState(false);

@@ -13,7 +13,15 @@ const REFRESH_MS = 20_000;
 
 const SessionsContext = createContext<SessionsValue>({ sessions: [], showOwner: false, refresh: async () => {} });
 
-export function SessionsProvider({ sessions: initialSessions, viewerId, children }: { sessions: SessionRowWithStatus[]; viewerId: string; children: React.ReactNode }) {
+export function SessionsProvider({
+  sessions: initialSessions,
+  viewerId,
+  children,
+}: {
+  sessions: SessionRowWithStatus[];
+  viewerId: string;
+  children: React.ReactNode;
+}) {
   const [sessions, setSessions] = useState(initialSessions);
   const inFlight = useRef(false);
 

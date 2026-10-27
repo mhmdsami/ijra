@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { decideRun, getRun, getRuns } from "@/db";
-import { requireSameOrigin } from "@/lib/csrf";
 import { canReviewRun } from "@/lib/access";
+import { requireSameOrigin } from "@/lib/csrf";
 import { requireUser } from "@/lib/user";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  try { requireSameOrigin(req); } catch { return NextResponse.json({ error: "cross-origin request blocked" }, { status: 403 }); }
+  try {
+    requireSameOrigin(req);
+  } catch {
+    return NextResponse.json({ error: "cross-origin request blocked" }, { status: 403 });
+  }
   const user = await requireUser();
   if (!canReviewRun(user)) return NextResponse.json({ error: "only admins can reject" }, { status: 403 });
 

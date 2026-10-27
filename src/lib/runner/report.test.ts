@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { acceptsReport, parseRunnerReport, reportFingerprint, reportMessage, reportStatus } from "./report.ts";
 
 test("parses a valid runner report", () => {
@@ -40,7 +40,17 @@ test("coerces unknown or dashboard-only statuses to failed", () => {
 
 test("only dispatching, running, and failed runs accept a report", () => {
   for (const status of ["dispatching", "running", "failed"]) assert.equal(acceptsReport(status), true, status);
-  for (const status of ["awaiting_review", "merged", "rejected", "closed", "cancelled", "blocked", "answered", "no_changes", "done"]) {
+  for (const status of [
+    "awaiting_review",
+    "merged",
+    "rejected",
+    "closed",
+    "cancelled",
+    "blocked",
+    "answered",
+    "no_changes",
+    "done",
+  ]) {
     assert.equal(acceptsReport(status), false, status);
   }
 });

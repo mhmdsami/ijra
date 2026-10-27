@@ -1,17 +1,26 @@
 import { NextResponse } from "next/server";
-import { requireSameOrigin } from "@/lib/csrf";
 import { addImage, getSession } from "@/db";
-import { canAccessSession, requireUser } from "@/lib/user";
+import { requireSameOrigin } from "@/lib/csrf";
 import { decodeBase64Image, imageMetaError, MAX_IMAGES_PER_SESSION, MAX_IMAGES_PER_USER_PER_DAY } from "@/lib/images";
+import { canAccessSession, requireUser } from "@/lib/user";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  try { requireSameOrigin(req); } catch { return NextResponse.json({ error: "cross-origin request blocked" }, { status: 403 }); }
+  try {
+    requireSameOrigin(req);
+  } catch {
+    return NextResponse.json({ error: "cross-origin request blocked" }, { status: 403 });
+  }
   const user = await requireUser();
   const session = await getSession(id);
   if (!session || !canAccessSession(user, session)) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const body = (await req.json().catch(() => null)) as { mime?: string; width?: number; height?: number; data?: string } | null;
+  const body = (await req.json().catch(() => null)) as {
+    mime?: string;
+    width?: number;
+    height?: number;
+    data?: string;
+  } | null;
   if (!body?.mime || !body.data) return NextResponse.json({ error: "mime and data are required" }, { status: 400 });
 
   const bytes = decodeBase64Image(body.data);
@@ -33,9 +42,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if ("error" in image) {
     return NextResponse.json(
       {
-        error: image.error === "session"
-          ? `this session has reached its image limit (${MAX_IMAGES_PER_SESSION})`
-          : `image upload limit reached (${MAX_IMAGES_PER_USER_PER_DAY} per day)`,
+        error:
+          image.error === "session"
+            ? `this session has reached its image limit (${MAX_IMAGES_PER_SESSION})`
+            : `image upload limit reached (${MAX_IMAGES_PER_USER_PER_DAY} per day)`,
       },
       { status: 429 },
     );

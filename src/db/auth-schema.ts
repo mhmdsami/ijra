@@ -63,6 +63,5 @@ export const userProject = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     project: text("project").notNull(),
   },
-  (t) => [primaryKey({ columns: [t.userId, t.project] })]
+  (t) => [primaryKey({ columns: [t.userId, t.project] })],
 );
-

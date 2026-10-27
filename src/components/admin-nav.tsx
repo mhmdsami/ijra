@@ -21,7 +21,7 @@ export function AdminNav() {
           aria-current={pathname === tab.href ? "page" : undefined}
           className={cn(
             "rounded-md px-2.5 py-1 text-2xs font-medium tracking-[0.06em] uppercase transition-colors",
-            pathname === tab.href ? "bg-foreground text-background" : "text-text-tertiary hover:text-foreground"
+            pathname === tab.href ? "bg-foreground text-background" : "text-text-tertiary hover:text-foreground",
           )}
         >
           {tab.label}

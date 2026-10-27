@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { hmacHex } from "./github-signature.ts";
 import { SIGNATURE_MAX_AGE_MS, verifySignature } from "./signature.ts";
 
@@ -24,13 +24,19 @@ test("applies a lowercase comparison so hex case does not matter", async () => {
 test("rejects a signature older than the freshness window", async () => {
   const timestamp = 1_760_000_000_000;
   const signature = await sign(timestamp);
-  assert.equal(await verifySignature(body, String(timestamp), signature, secret, timestamp + SIGNATURE_MAX_AGE_MS + 1), false);
+  assert.equal(
+    await verifySignature(body, String(timestamp), signature, secret, timestamp + SIGNATURE_MAX_AGE_MS + 1),
+    false,
+  );
 });
 
 test("rejects a signature from the future beyond the window", async () => {
   const timestamp = 1_760_000_000_000;
   const signature = await sign(timestamp);
-  assert.equal(await verifySignature(body, String(timestamp), signature, secret, timestamp - SIGNATURE_MAX_AGE_MS - 1), false);
+  assert.equal(
+    await verifySignature(body, String(timestamp), signature, secret, timestamp - SIGNATURE_MAX_AGE_MS - 1),
+    false,
+  );
 });
 
 test("rejects a tampered body", async () => {

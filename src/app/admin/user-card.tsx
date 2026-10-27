@@ -1,9 +1,9 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
-import { deleteUserAction, saveAccessAction, setAdminAction } from "./actions";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { deleteUserAction, saveAccessAction, setAdminAction } from "./actions";
 
 export type Grant = { project: string; canWrite: boolean };
 export type AdminUser = { id: string; email: string; role: string | null; projects: Grant[]; limit: number | null };
@@ -30,9 +30,11 @@ export function UserCard({
   const initial = Object.fromEntries(user.projects.map((g) => [g.project, g.canWrite ? "write" : "ask"] as const));
   const [draft, setDraft] = useState<Record<string, "ask" | "write">>(initial);
   const [draftLimit, setDraftLimit] = useState<string>(user.limit === null ? "" : String(user.limit));
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const limitStored = user.limit === null ? "" : String(user.limit);
-  const limitInvalid = draftLimit.trim() !== "" && (!/^\d+$/.test(draftLimit.trim()) || Number(draftLimit) < 1 || Number(draftLimit) > 1000);
+  const limitInvalid =
+    draftLimit.trim() !== "" &&
+    (!/^\d+$/.test(draftLimit.trim()) || Number(draftLimit) < 1 || Number(draftLimit) > 1000);
   const dirty = (JSON.stringify(draft) !== JSON.stringify(initial) || draftLimit !== limitStored) && !limitInvalid;
 
   useEffect(() => {
@@ -53,7 +55,10 @@ export function UserCard({
               <form action={setAdminAction}>
                 <input type="hidden" name="userId" value={user.id} />
                 <input type="hidden" name="admin" value="on" />
-                <button type="submit" className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground">
+                <button
+                  type="submit"
+                  className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                >
                   Make admin
                 </button>
               </form>
@@ -61,7 +66,11 @@ export function UserCard({
             {canDelete && (
               <form action={deleteUserAction}>
                 <input type="hidden" name="userId" value={user.id} />
-                <button type="submit" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-destructive" aria-label={`Delete ${user.email}`}>
+                <button
+                  type="submit"
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-destructive"
+                  aria-label={`Delete ${user.email}`}
+                >
                   <Trash2 className="size-3.5" />
                 </button>
               </form>
@@ -75,14 +84,28 @@ export function UserCard({
       ) : isAdmin ? (
         <p className="mt-2 text-xs text-text-tertiary">Admin: full access to all projects.</p>
       ) : (
-        <form id={`access-${user.id}`} action={saveAccessAction} className="mt-3 flex flex-col gap-1.5">
+        <form
+          id={`access-${user.id}`}
+          action={async (formData) => {
+            setPending(true);
+            try {
+              await saveAccessAction(formData);
+            } finally {
+              setPending(false);
+            }
+          }}
+          className="mt-3 flex flex-col gap-1.5"
+        >
           <input type="hidden" name="userId" value={user.id} />
           {Object.entries(draft).map(([project, level]) => (
             <input key={project} type="hidden" name="grant" value={`${project}:${level}`} />
           ))}
           <input type="hidden" name="limit" value={draftLimit.trim()} />
           {Object.entries(draft).map(([project, level]) => (
-            <div key={project} className="flex items-center justify-between gap-3 rounded-md bg-surface-2/50 px-2.5 py-1.5">
+            <div
+              key={project}
+              className="flex items-center justify-between gap-3 rounded-md bg-surface-2/50 px-2.5 py-1.5"
+            >
               <span className="truncate text-xs">{project}</span>
               <div className="flex shrink-0 items-center gap-1">
                 <span className="flex items-center gap-0.5 rounded-md bg-background/40 p-0.5">
@@ -94,7 +117,7 @@ export function UserCard({
                       onClick={() => setDraft((d) => ({ ...d, [project]: l }))}
                       className={cn(
                         "rounded-sm px-2 py-0.5 text-2xs transition-colors",
-                        level === l ? "bg-surface-3 text-foreground" : "text-text-tertiary hover:text-foreground"
+                        level === l ? "bg-surface-3 text-foreground" : "text-text-tertiary hover:text-foreground",
                       )}
                       title={l === "ask" ? "Questions only" : "Can open pull requests"}
                     >
@@ -104,7 +127,12 @@ export function UserCard({
                 </span>
                 <button
                   type="button"
-                  onClick={() => setDraft((d) => { const { [project]: _, ...rest } = d; return rest; })}
+                  onClick={() =>
+                    setDraft((d) => {
+                      const { [project]: _, ...rest } = d;
+                      return rest;
+                    })
+                  }
                   className="ml-0.5 rounded-sm px-1 text-muted-foreground transition-colors hover:text-destructive"
                   aria-label={`Remove ${project}`}
                 >
@@ -121,13 +149,27 @@ export function UserCard({
               aria-label="Add project"
             >
               <option value="">Add project</option>
-              {allProjects.filter((p) => !(p in draft)).map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
+              {allProjects
+                .filter((p) => !(p in draft))
+                .map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
             </select>
           )}
-          <label className="flex items-center gap-2 pt-1" title={limitInvalid ? "daily limit must be 1 to 1000" : undefined}>
-            <span className={cn("text-2xs tracking-[0.06em] uppercase", limitInvalid ? "text-destructive" : "text-text-tertiary")}>daily limit</span>
+          <label
+            className="flex items-center gap-2 pt-1"
+            title={limitInvalid ? "daily limit must be 1 to 1000" : undefined}
+          >
+            <span
+              className={cn(
+                "text-2xs tracking-[0.06em] uppercase",
+                limitInvalid ? "text-destructive" : "text-text-tertiary",
+              )}
+            >
+              daily limit
+            </span>
             <input
               type="number"
               min={1}
@@ -152,7 +194,10 @@ export function UserCard({
             </button>
             <button
               type="button"
-              onClick={() => { setDraft(initial); setDraftLimit(limitStored); }}
+              onClick={() => {
+                setDraft(initial);
+                setDraftLimit(limitStored);
+              }}
               disabled={!dirty || pending}
               className="rounded-md border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-40"
             >

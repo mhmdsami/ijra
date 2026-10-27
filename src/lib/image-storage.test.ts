@@ -1,6 +1,6 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
+import { test } from "node:test";
 import { imageInsertStatement } from "./image-storage.ts";
 import { MAX_IMAGES_PER_SESSION, MAX_IMAGES_PER_USER_PER_DAY } from "./images.ts";
 
@@ -32,7 +32,7 @@ function addSession(db: DatabaseSync, id: string, ownerId: string) {
 let sequence = 0;
 function upload(
   db: DatabaseSync,
-  input: { sessionId: string; ownerId: string; createdAt?: number; dayStart?: number }
+  input: { sessionId: string; ownerId: string; createdAt?: number; dayStart?: number },
 ) {
   sequence += 1;
   const { sql, binds } = imageInsertStatement({
@@ -83,7 +83,8 @@ test("images from before the current day do not count", () => {
   addSession(db, "s1", "u1");
   addSession(db, "s2", "u1");
   addSession(db, "s3", "u1");
-  for (let n = 0; n < MAX_IMAGES_PER_SESSION; n += 1) upload(db, { sessionId: "s1", ownerId: "u1", createdAt: 500, dayStart: 0 });
+  for (let n = 0; n < MAX_IMAGES_PER_SESSION; n += 1)
+    upload(db, { sessionId: "s1", ownerId: "u1", createdAt: 500, dayStart: 0 });
   for (let n = 0; n < MAX_IMAGES_PER_USER_PER_DAY - MAX_IMAGES_PER_SESSION; n += 1) {
     upload(db, { sessionId: "s2", ownerId: "u1", createdAt: 500, dayStart: 0 });
   }

@@ -1,6 +1,6 @@
 import { getRuns, getSession, listProgress } from "@/db";
-import { canAccessSession, requireUser } from "@/lib/user";
 import type { StreamEvent } from "@/lib/types";
+import { canAccessSession, requireUser } from "@/lib/user";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +30,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         closed = true;
         try {
           controller.close();
-        } catch {
-        }
+        } catch {}
       };
       req.signal.addEventListener("abort", close);
 

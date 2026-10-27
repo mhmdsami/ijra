@@ -1,6 +1,6 @@
+import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { test } from "node:test";
-import assert from "node:assert/strict";
 import { validGithubSignature } from "./github-signature.ts";
 
 const secret = "test-secret";

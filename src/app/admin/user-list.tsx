@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { Users } from "lucide-react";
+import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
-import { UserCard, type AdminUser } from "./user-card";
+import { type AdminUser, UserCard } from "./user-card";
 
 export function UserList({
   users,
@@ -47,7 +47,11 @@ export function UserList({
           variant="inline"
           title="No users match."
           action={
-            <button onClick={() => setQ("")} className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => setQ("")}
+              className="rounded-md border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+            >
               Clear search
             </button>
           }

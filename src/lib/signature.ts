@@ -7,7 +7,7 @@ export async function verifySignature(
   timestamp: string,
   signature: string,
   secret: string,
-  now = Date.now()
+  now = Date.now(),
 ) {
   if (!/^\d+$/.test(timestamp)) return false;
   if (Math.abs(now - Number(timestamp)) > SIGNATURE_MAX_AGE_MS) return false;

@@ -3,7 +3,6 @@
 import { ArrowUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-
 export function ComposerControls({
   model,
   models,
@@ -36,6 +35,7 @@ export function ComposerControls({
         ))}
       </select>
       <button
+        type="button"
         onClick={onSend}
         disabled={disabled || busy}
         className="shrink-0 rounded-md p-1.5 text-foreground transition-[background-color,transform,opacity] hover:bg-surface-3 active:scale-95 disabled:opacity-40"
