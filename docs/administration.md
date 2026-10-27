@@ -13,7 +13,7 @@ Grants are stored in `user_projects`. The project list comes from `src/projects.
 
 ## Quotas
 
-Each user has a daily request limit, default 5. A project can have one active run at a time. `createRun` enforces both atomically.
+Each user has a daily request limit, default 5. A project can have one active run at a time. `createRun` enforces both atomically. Failed, blocked, and cancelled runs do not consume the daily limit, and the window resets at midnight UTC.
 
 Images have separate storage caps: 3 per message, 1.5 MB each, 20 per session, and 40 per user per UTC day. The upload insert enforces the session and daily caps in one statement, and deleting a thread deletes its images.
 

@@ -1,7 +1,7 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
-import { admissionStatement, type AdmissionInput } from "./admission.ts";
+import { test } from "node:test";
+import { type AdmissionInput, admissionStatement } from "./admission.ts";
 
 function openDatabase() {
   const db = new DatabaseSync(":memory:");
@@ -44,12 +44,22 @@ function admit(db: DatabaseSync, overrides: Partial<AdmissionInput> = {}) {
   return { admitted: Number(result.changes) === 1, id: input.id };
 }
 
-function seed(db: DatabaseSync, rows: { id: string; project?: string; user?: string; status?: string; dispatchAt?: number }[]) {
+function seed(
+  db: DatabaseSync,
+  rows: { id: string; project?: string; user?: string; status?: string; dispatchAt?: number }[],
+) {
   const insert = db.prepare(
-    "INSERT INTO runs (id, session_id, project, request, model, requested_by, mode, status, dispatch_at, updated_at) VALUES (?, 's', ?, 'r', 'm', ?, 'auto', ?, ?, ?)"
+    "INSERT INTO runs (id, session_id, project, request, model, requested_by, mode, status, dispatch_at, updated_at) VALUES (?, 's', ?, 'r', 'm', ?, 'auto', ?, ?, ?)",
   );
   for (const row of rows) {
-    insert.run(row.id, row.project ?? "ijra", row.user ?? "user-1", row.status ?? "done", row.dispatchAt ?? 500, row.dispatchAt ?? 500);
+    insert.run(
+      row.id,
+      row.project ?? "ijra",
+      row.user ?? "user-1",
+      row.status ?? "done",
+      row.dispatchAt ?? 500,
+      row.dispatchAt ?? 500,
+    );
   }
 }
 
@@ -77,7 +87,10 @@ test("only dispatching and running runs hold the project slot", () => {
 
 test("enforces the configured daily limit against runs in the window", () => {
   const db = openDatabase();
-  seed(db, [1, 2, 3, 4, 5].map((n) => ({ id: `history-${n}`, user: "user-1", dispatchAt: 500 })));
+  seed(
+    db,
+    [1, 2, 3, 4, 5].map((n) => ({ id: `history-${n}`, user: "user-1", dispatchAt: 500 })),
+  );
   assert.equal(admit(db, { dailyLimit: 5 }).admitted, false);
   assert.equal(admit(db, { dailyLimit: 6 }).admitted, true);
 });
@@ -90,13 +103,40 @@ test("does not count runs before the window", () => {
 
 test("counts only the requesting user", () => {
   const db = openDatabase();
-  seed(db, [1, 2, 3, 4, 5].map((n) => ({ id: `other-${n}`, user: "user-2", dispatchAt: 500 })));
+  seed(
+    db,
+    [1, 2, 3, 4, 5].map((n) => ({ id: `other-${n}`, user: "user-2", dispatchAt: 500 })),
+  );
   assert.equal(admit(db, { dailyLimit: 5 }).admitted, true);
+});
+
+test("failed, blocked, and cancelled runs do not consume quota", () => {
+  const db = openDatabase();
+  seed(db, [
+    { id: "failed", status: "failed", dispatchAt: 500 },
+    { id: "blocked", status: "blocked", dispatchAt: 500 },
+    { id: "cancelled", status: "cancelled", dispatchAt: 500 },
+  ]);
+  assert.equal(admit(db, { dailyLimit: 1 }).admitted, true);
+});
+
+test("only non-exempt outcomes fill the daily limit", () => {
+  const db = openDatabase();
+  seed(db, [
+    ...Array.from({ length: 4 }, (_, n) => ({ id: `done-${n}`, status: "merged", dispatchAt: 500 })),
+    { id: "failed", status: "failed", dispatchAt: 500 },
+  ]);
+  assert.equal(admit(db, { dailyLimit: 5 }).admitted, true);
+  seed(db, [{ id: "review", status: "awaiting_review", dispatchAt: 500 }]);
+  assert.equal(admit(db, { dailyLimit: 5 }).admitted, false);
 });
 
 test("a null limit skips the quota check", () => {
   const db = openDatabase();
-  seed(db, Array.from({ length: 10 }, (_, n) => ({ id: `history-${n}`, dispatchAt: 500 })));
+  seed(
+    db,
+    Array.from({ length: 10 }, (_, n) => ({ id: `history-${n}`, dispatchAt: 500 })),
+  );
   assert.equal(admit(db, { dailyLimit: null }).admitted, true);
 });
 

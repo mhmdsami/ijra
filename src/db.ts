@@ -1,9 +1,9 @@
 import { env, now } from "./env";
-import type { ProgressEvent, ProgressKind, ProgressRow, SessionImage } from "./lib/types";
-import { canTransition } from "./lib/runner/transitions";
-import { ACTIVE_RUN_STATUSES, admissionStatement } from "./lib/admission";
+import { ACTIVE_RUN_STATUSES, admissionStatement, QUOTA_EXEMPT_STATUSES } from "./lib/admission";
 import { imageInsertStatement } from "./lib/image-storage";
 import { MAX_IMAGES_PER_SESSION } from "./lib/images";
+import { canTransition } from "./lib/runner/transitions";
+import type { ProgressEvent, ProgressRow, SessionImage } from "./lib/types";
 
 export const DEFAULT_DAILY_LIMIT = 5;
 
@@ -71,12 +71,24 @@ async function readModels(): Promise<ModelRow[]> {
   if (!Array.isArray(parsed)) return [];
   return parsed
     .filter((m) => typeof m?.id === "string")
-    .map((m) => ({ id: m.id as string, label: typeof m.label === "string" ? m.label : (m.id as string), vision: m.vision ? 1 : 0, is_default: m.default ? 1 : 0 }));
+    .map((m) => ({
+      id: m.id as string,
+      label: typeof m.label === "string" ? m.label : (m.id as string),
+      vision: m.vision ? 1 : 0,
+      is_default: m.default ? 1 : 0,
+    }));
 }
 
 async function writeModels(models: ModelRow[]) {
-  const value = JSON.stringify(models.map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, default: m.is_default === 1 })));
-  await env().DB.prepare("INSERT INTO settings (key, value) VALUES ('models', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value").bind(value).run();
+  const value = JSON.stringify(
+    models.map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1, default: m.is_default === 1 })),
+  );
+  await env()
+    .DB.prepare(
+      "INSERT INTO settings (key, value) VALUES ('models', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    )
+    .bind(value)
+    .run();
 }
 
 export interface ModelUsage {
@@ -87,9 +99,13 @@ export interface ModelUsage {
 
 export async function modelUsage() {
   const { results } = await env()
-    .DB.prepare("SELECT model, COUNT(*) AS runs, COUNT(DISTINCT requested_by) AS users, MAX(dispatch_at) AS last FROM runs GROUP BY model")
+    .DB.prepare(
+      "SELECT model, COUNT(*) AS runs, COUNT(DISTINCT requested_by) AS users, MAX(dispatch_at) AS last FROM runs GROUP BY model",
+    )
     .all<{ model: string; runs: number; users: number; last: number | null }>();
-  return Object.fromEntries((results ?? []).map((r) => [r.model, { runs: r.runs, users: r.users, last: r.last }])) as Record<string, ModelUsage>;
+  return Object.fromEntries(
+    (results ?? []).map((r) => [r.model, { runs: r.runs, users: r.users, last: r.last }]),
+  ) as Record<string, ModelUsage>;
 }
 
 export async function listModels() {
@@ -168,7 +184,11 @@ export async function deleteUserRow(id: string) {
     db.prepare("DELETE FROM messages WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
     db.prepare("DELETE FROM runs WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
     db.prepare("DELETE FROM images WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?)").bind(id),
-    db.prepare("DELETE FROM run_progress WHERE run_id IN (SELECT id FROM runs WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?))").bind(id),
+    db
+      .prepare(
+        "DELETE FROM run_progress WHERE run_id IN (SELECT id FROM runs WHERE session_id IN (SELECT id FROM sessions WHERE owner_id = ?))",
+      )
+      .bind(id),
     db.prepare("DELETE FROM sessions WHERE owner_id = ?").bind(id),
     db.prepare("DELETE FROM user_projects WHERE userId = ?").bind(id),
     db.prepare("DELETE FROM user_limits WHERE user_id = ?").bind(id),
@@ -179,7 +199,7 @@ export async function deleteUserRow(id: string) {
 export async function setUserProject(userId: string, project: string, canWrite: boolean) {
   await env()
     .DB.prepare(
-      "INSERT INTO user_projects (userId, project, can_write) VALUES (?, ?, ?) ON CONFLICT (userId, project) DO UPDATE SET can_write = excluded.can_write"
+      "INSERT INTO user_projects (userId, project, can_write) VALUES (?, ?, ?) ON CONFLICT (userId, project) DO UPDATE SET can_write = excluded.can_write",
     )
     .bind(userId, project, canWrite ? 1 : 0)
     .run();
@@ -217,7 +237,9 @@ export async function listSessionsForUser(userId: string, allowedProjects: strin
       : `${listSessionsBase} WHERE s.owner_id = ? AND s.project IN (${allowedProjects.map(() => "?").join(", ")}) ORDER BY s.created_at DESC`;
   const { results } = await (allowedProjects === null
     ? env().DB.prepare(stmt)
-    : env().DB.prepare(stmt).bind(userId, ...allowedProjects)
+    : env()
+        .DB.prepare(stmt)
+        .bind(userId, ...allowedProjects)
   ).all<SessionRowWithStatus>();
   return results ?? [];
 }
@@ -233,14 +255,16 @@ export async function getSession(id: string) {
 
 export async function createSession(project: string, ownerId: string) {
   const id = crypto.randomUUID();
-  await env().DB.prepare("INSERT INTO sessions (id, project, owner_id, created_at) VALUES (?, ?, ?, ?)")
+  await env()
+    .DB.prepare("INSERT INTO sessions (id, project, owner_id, created_at) VALUES (?, ?, ?, ?)")
     .bind(id, project, ownerId, now())
     .run();
   return id;
 }
 
 export async function addMessage(sessionId: string, role: "user" | "agent", content: string, meta?: object) {
-  await env().DB.prepare("INSERT INTO messages (session_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)")
+  await env()
+    .DB.prepare("INSERT INTO messages (session_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)")
     .bind(sessionId, role, content, meta ? JSON.stringify(meta) : null, now())
     .run();
 }
@@ -256,7 +280,7 @@ function redactAuditMetadata(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redactAuditMetadata);
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(
-    Object.entries(value).map(([key, child]) => [key, secretKey.test(key) ? "[redacted]" : redactAuditMetadata(child)])
+    Object.entries(value).map(([key, child]) => [key, secretKey.test(key) ? "[redacted]" : redactAuditMetadata(child)]),
   );
 }
 
@@ -268,29 +292,38 @@ export async function appendAuditEvent(input: {
   metadata?: Record<string, unknown>;
 }) {
   const metadata = input.metadata ? JSON.stringify(redactAuditMetadata(input.metadata)) : null;
-  await env().DB.prepare(
-    "INSERT INTO audit_events (run_id, session_id, actor_id, action, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-  )
+  await env()
+    .DB.prepare(
+      "INSERT INTO audit_events (run_id, session_id, actor_id, action, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    )
     .bind(input.runId ?? null, input.sessionId, input.actorId ?? null, input.action, metadata, now())
     .run();
 }
 
 export async function countRunsForUserSince(userId: string, since: number) {
+  const exempt = QUOTA_EXEMPT_STATUSES.map(() => "?").join(", ");
   const row = await env()
-    .DB.prepare("SELECT COUNT(*) AS n FROM runs WHERE requested_by = ? AND dispatch_at >= ?")
-    .bind(userId, since)
+    .DB.prepare(
+      `SELECT COUNT(*) AS n FROM runs WHERE requested_by = ? AND dispatch_at >= ? AND status NOT IN (${exempt})`,
+    )
+    .bind(userId, since, ...QUOTA_EXEMPT_STATUSES)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
 export async function getUserLimit(userId: string) {
-  const row = await env().DB.prepare("SELECT daily_limit FROM user_limits WHERE user_id = ?").bind(userId).first<{ daily_limit: number }>();
+  const row = await env()
+    .DB.prepare("SELECT daily_limit FROM user_limits WHERE user_id = ?")
+    .bind(userId)
+    .first<{ daily_limit: number }>();
   return row?.daily_limit ?? null;
 }
 
 export async function setUserLimit(userId: string, dailyLimit: number) {
   await env()
-    .DB.prepare("INSERT INTO user_limits (user_id, daily_limit) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET daily_limit = excluded.daily_limit")
+    .DB.prepare(
+      "INSERT INTO user_limits (user_id, daily_limit) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET daily_limit = excluded.daily_limit",
+    )
     .bind(userId, dailyLimit)
     .run();
 }
@@ -302,9 +335,10 @@ export async function removeUserLimit(userId: string) {
 const activeRunStatuses = ACTIVE_RUN_STATUSES;
 
 export async function countActiveRunsForProject(project: string) {
-  const row = await env().DB.prepare(
-    `SELECT COUNT(*) AS n FROM runs WHERE project = ? AND status IN (${activeRunStatuses.map(() => "?").join(", ")})`
-  )
+  const row = await env()
+    .DB.prepare(
+      `SELECT COUNT(*) AS n FROM runs WHERE project = ? AND status IN (${activeRunStatuses.map(() => "?").join(", ")})`,
+    )
     .bind(project, ...activeRunStatuses)
     .first<{ n: number }>();
   return row?.n ?? 0;
@@ -318,7 +352,7 @@ export async function createRun(
   requestedBy: string,
   requestWindowStart: number,
   dailyLimit: number | null,
-  mode: "fix" | "ask" | "auto" = "auto"
+  mode: "fix" | "ask" | "auto" = "auto",
 ) {
   const id = crypto.randomUUID();
   const t = now();
@@ -334,7 +368,10 @@ export async function createRun(
     mode,
     dispatchAt: t,
   });
-  const result = await env().DB.prepare(sql).bind(...binds).run();
+  const result = await env()
+    .DB.prepare(sql)
+    .bind(...binds)
+    .run();
   return result.meta.changes === 1 ? id : null;
 }
 
@@ -359,32 +396,45 @@ export async function addImage(input: {
     createdAt: now(),
     dayStart: input.dayStart,
   });
-  const result = await env().DB.prepare(sql).bind(...binds).run();
+  const result = await env()
+    .DB.prepare(sql)
+    .bind(...binds)
+    .run();
   if (result.meta.changes === 1) return { id };
   const sessionCount = await countImagesForSession(input.sessionId);
   return { error: sessionCount >= MAX_IMAGES_PER_SESSION ? "session" : "user" };
 }
 
 export async function countImagesForSession(sessionId: string) {
-  const row = await env().DB.prepare("SELECT COUNT(*) AS n FROM images WHERE session_id = ?").bind(sessionId).first<{ n: number }>();
+  const row = await env()
+    .DB.prepare("SELECT COUNT(*) AS n FROM images WHERE session_id = ?")
+    .bind(sessionId)
+    .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
 export async function countImagesForOwnerSince(ownerId: string, since: number) {
   const row = await env()
-    .DB.prepare("SELECT COUNT(*) AS n FROM images i JOIN sessions s ON s.id = i.session_id WHERE s.owner_id = ? AND i.created_at >= ?")
+    .DB.prepare(
+      "SELECT COUNT(*) AS n FROM images i JOIN sessions s ON s.id = i.session_id WHERE s.owner_id = ? AND i.created_at >= ?",
+    )
     .bind(ownerId, since)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
 export async function getImage(id: string) {
-  return env().DB.prepare("SELECT * FROM images WHERE id = ?").bind(id).first<SessionImage & { bytes: ArrayBuffer | number[] }>();
+  return env()
+    .DB.prepare("SELECT * FROM images WHERE id = ?")
+    .bind(id)
+    .first<SessionImage & { bytes: ArrayBuffer | number[] }>();
 }
 
 export async function listSessionImages(sessionId: string) {
   const { results } = await env()
-    .DB.prepare("SELECT id, session_id, run_id, mime, width, height, created_at FROM images WHERE session_id = ? ORDER BY created_at")
+    .DB.prepare(
+      "SELECT id, session_id, run_id, mime, width, height, created_at FROM images WHERE session_id = ? ORDER BY created_at",
+    )
     .bind(sessionId)
     .all<SessionImage>();
   return results ?? [];
@@ -410,7 +460,10 @@ export async function countSessionImages(sessionId: string, ids: string[]) {
 
 export async function setImagesRun(ids: string[], runId: string) {
   if (ids.length === 0) return;
-  await env().DB.prepare(`UPDATE images SET run_id = ? WHERE id IN (${ids.map(() => "?").join(", ")})`).bind(runId, ...ids).run();
+  await env()
+    .DB.prepare(`UPDATE images SET run_id = ? WHERE id IN (${ids.map(() => "?").join(", ")})`)
+    .bind(runId, ...ids)
+    .run();
 }
 
 export async function appendProgress(runId: string, events: ProgressEvent[]) {
@@ -418,9 +471,11 @@ export async function appendProgress(runId: string, events: ProgressEvent[]) {
   const db = env().DB;
   const t = now();
   await db.batch(
-    events.map((event) => db
-      .prepare("INSERT OR IGNORE INTO run_progress (run_id, seq, kind, text, created_at) VALUES (?, ?, ?, ?, ?)")
-      .bind(runId, event.seq, event.kind, event.text, t))
+    events.map((event) =>
+      db
+        .prepare("INSERT OR IGNORE INTO run_progress (run_id, seq, kind, text, created_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(runId, event.seq, event.kind, event.text, t),
+    ),
   );
 }
 
@@ -448,11 +503,25 @@ export async function deleteSession(sessionId: string) {
 }
 
 export async function updateRun(id: string, fields: Partial<RunRow>) {
-  const allowed = ["status", "gh_run_id", "gh_run_url", "pr_url", "branch", "safe_zone", "agent_msg", "policy_status", "policy_reasons", "checks_status", "error_detail", "parent_run_id"] as const;
+  const allowed = [
+    "status",
+    "gh_run_id",
+    "gh_run_url",
+    "pr_url",
+    "branch",
+    "safe_zone",
+    "agent_msg",
+    "policy_status",
+    "policy_reasons",
+    "checks_status",
+    "error_detail",
+    "parent_run_id",
+  ] as const;
   const sets = allowed.filter((k) => k in fields);
   if (sets.length === 0) return;
   const sql = `UPDATE runs SET ${sets.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?`;
-  await env().DB.prepare(sql)
+  await env()
+    .DB.prepare(sql)
     .bind(...sets.map((k) => fields[k] ?? null), now(), id)
     .run();
 }
@@ -474,13 +543,21 @@ export async function setRunStatus(input: {
   if (input.from.length === 0) return false;
   const sets = ["status = ?", "updated_at = ?"];
   const values: (string | number | null)[] = [input.to, now()];
-  if (input.prUrl !== undefined) { sets.push("pr_url = ?"); values.push(input.prUrl); }
-  if (input.branch !== undefined) { sets.push("branch = ?"); values.push(input.branch); }
-  if (input.runUrl !== undefined) { sets.push("gh_run_url = ?"); values.push(input.runUrl); }
+  if (input.prUrl !== undefined) {
+    sets.push("pr_url = ?");
+    values.push(input.prUrl);
+  }
+  if (input.branch !== undefined) {
+    sets.push("branch = ?");
+    values.push(input.branch);
+  }
+  if (input.runUrl !== undefined) {
+    sets.push("gh_run_url = ?");
+    values.push(input.runUrl);
+  }
   const placeholders = input.from.map(() => "?").join(", ");
-  const { results } = await env().DB.prepare(
-    `UPDATE runs SET ${sets.join(", ")} WHERE id = ? AND status IN (${placeholders}) RETURNING session_id`
-  )
+  const { results } = await env()
+    .DB.prepare(`UPDATE runs SET ${sets.join(", ")} WHERE id = ? AND status IN (${placeholders}) RETURNING session_id`)
     .bind(...values, input.id, ...input.from)
     .all<{ session_id: string }>();
   const updated = results?.[0];
@@ -508,12 +585,13 @@ export async function decideRun(input: {
   if (!input.from.some((from) => canTransition(from, input.status))) return false;
   const t = now();
   const placeholders = input.from.map(() => "?").join(", ");
-  const { results } = await env().DB.prepare(
-    `UPDATE runs
+  const { results } = await env()
+    .DB.prepare(
+      `UPDATE runs
      SET status = ?, decision = ?, decided_by = ?, decided_at = ?, decision_reason = ?, updated_at = ?
      WHERE id = ? AND status IN (${placeholders})
-     RETURNING session_id`
-  )
+     RETURNING session_id`,
+    )
     .bind(input.status, input.decision, input.actorId, t, input.reason ?? null, t, input.id, ...input.from)
     .all<{ session_id: string }>();
   const updated = results?.[0];
@@ -549,16 +627,17 @@ export async function listRecentRuns(input: { limit?: number; project?: string |
     where.push("r.requested_by = ?");
     binds.push(input.actorId);
   }
-  const { results } = await env().DB.prepare(
-    `SELECT r.*,
+  const { results } = await env()
+    .DB.prepare(
+      `SELECT r.*,
        (SELECT email FROM user WHERE id = r.requested_by) AS requester_email,
        (SELECT email FROM user WHERE id = r.decided_by) AS decider_email,
        (SELECT email FROM user WHERE id = s.owner_id) AS owner_email
      FROM runs r LEFT JOIN sessions s ON s.id = r.session_id
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ORDER BY r.dispatch_at DESC, r.rowid DESC
-     LIMIT ?`
-  )
+     LIMIT ?`,
+    )
     .bind(...binds, Math.min(Math.max(input.limit ?? 50, 1), 200))
     .all<RunAuditRow>();
   return results ?? [];
@@ -569,7 +648,9 @@ export interface AuditEventView extends AuditEventRow {
   project: string | null;
 }
 
-export async function listAuditEvents(input: { limit?: number; project?: string | null; actorId?: string | null } = {}) {
+export async function listAuditEvents(
+  input: { limit?: number; project?: string | null; actorId?: string | null } = {},
+) {
   const where: string[] = [];
   const binds: (string | number)[] = [];
   if (input.project) {
@@ -580,22 +661,24 @@ export async function listAuditEvents(input: { limit?: number; project?: string 
     where.push("a.actor_id = ?");
     binds.push(input.actorId);
   }
-  const { results } = await env().DB.prepare(
-    `SELECT a.*, u.email AS actor_email, s.project AS project
+  const { results } = await env()
+    .DB.prepare(
+      `SELECT a.*, u.email AS actor_email, s.project AS project
      FROM audit_events a
      LEFT JOIN user u ON u.id = a.actor_id
      LEFT JOIN sessions s ON s.id = a.session_id
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
      ORDER BY a.created_at DESC, a.id DESC
-     LIMIT ?`
-  )
+     LIMIT ?`,
+    )
     .bind(...binds, Math.min(Math.max(input.limit ?? 50, 1), 200))
     .all<AuditEventView>();
   return results ?? [];
 }
 
 export async function findRunByBranch(project: string, branch: string) {
-  return env().DB.prepare("SELECT * FROM runs WHERE project = ? AND branch = ? ORDER BY dispatch_at DESC LIMIT 1")
+  return env()
+    .DB.prepare("SELECT * FROM runs WHERE project = ? AND branch = ? ORDER BY dispatch_at DESC LIMIT 1")
     .bind(project, branch)
     .first<RunRow>();
 }

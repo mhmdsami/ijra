@@ -1,5 +1,8 @@
 export const ACTIVE_RUN_STATUSES = ["dispatching", "running"] as const;
 
+/** Outcomes that do not consume the requester's daily quota. */
+export const QUOTA_EXEMPT_STATUSES = ["failed", "blocked", "cancelled"] as const;
+
 export interface AdmissionInput {
   id: string;
   sessionId: string;
@@ -19,9 +22,15 @@ export interface AdmissionInput {
  * pass preflight checks and then both insert.
  */
 export function admissionStatement(input: AdmissionInput) {
+  const exempt = QUOTA_EXEMPT_STATUSES.map(() => "?").join(", ");
   const limitClause =
-    input.dailyLimit === null ? "" : " AND (SELECT COUNT(*) FROM runs WHERE requested_by = ? AND dispatch_at >= ?) < ?";
-  const limitBinds = input.dailyLimit === null ? [] : [input.requestedBy, input.requestWindowStart, input.dailyLimit];
+    input.dailyLimit === null
+      ? ""
+      : ` AND (SELECT COUNT(*) FROM runs WHERE requested_by = ? AND dispatch_at >= ? AND status NOT IN (${exempt})) < ?`;
+  const limitBinds =
+    input.dailyLimit === null
+      ? []
+      : [input.requestedBy, input.requestWindowStart, ...QUOTA_EXEMPT_STATUSES, input.dailyLimit];
   const activePlaceholders = ACTIVE_RUN_STATUSES.map(() => "?").join(", ");
 
   return {
