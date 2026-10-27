@@ -5,9 +5,19 @@ import { projects } from "@/lib/projects";
 import { SESSIONS_PER_DAY } from "@/lib/session-quota";
 import { canAccessProject, requireUser } from "@/lib/user";
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await requireUser();
-  return NextResponse.json(await listSessionsForUser(user.id, user.allowedProjects));
+  const params = new URL(req.url).searchParams;
+  const limit = Number.parseInt(params.get("limit") ?? "", 10);
+  const offset = Number.parseInt(params.get("offset") ?? "", 10);
+  const query = params.get("q") ?? "";
+  return NextResponse.json(
+    await listSessionsForUser(user.id, user.allowedProjects, {
+      limit: Number.isFinite(limit) ? limit : undefined,
+      offset: Number.isFinite(offset) ? offset : undefined,
+      query,
+    }),
+  );
 }
 
 export async function POST(req: Request) {

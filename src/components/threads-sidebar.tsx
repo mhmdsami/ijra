@@ -5,12 +5,13 @@ import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { EmptyState } from "@/components/empty-state";
+import { SessionLoadMore, SessionSearch } from "@/components/session-search";
 import { useSessions } from "@/components/sessions-context";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export function ThreadsSidebar() {
-  const { sessions, showOwner } = useSessions();
+  const { sessions, showOwner, query } = useSessions();
   const [open, setOpen] = useState(true);
   const [pending, setPending] = useState<string | null>(null);
   const pathname = usePathname();
@@ -83,9 +84,16 @@ export function ThreadsSidebar() {
           </button>
         </div>
       </div>
+      <div className="px-2 pb-2">
+        <SessionSearch />
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {sessions.length === 0 ? (
-          <EmptyState variant="inline" title="No threads yet" description="Your requests will appear here." />
+          query ? (
+            <p className="px-2 py-3 text-xs text-text-tertiary">No threads match.</p>
+          ) : (
+            <EmptyState variant="inline" title="No threads yet" description="Your requests will appear here." />
+          )
         ) : (
           <ul className="flex flex-col gap-0.5">
             {sessions.map((session) => {
@@ -120,6 +128,7 @@ export function ThreadsSidebar() {
             })}
           </ul>
         )}
+        <SessionLoadMore className="mt-1" />
       </div>
     </aside>
   );

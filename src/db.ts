@@ -4,6 +4,7 @@ import { PURGE_AUDIT_SQL } from "./lib/audit-retention";
 import { imageInsertStatement } from "./lib/image-storage";
 import { MAX_IMAGES_PER_SESSION } from "./lib/images";
 import { canTransition } from "./lib/runner/transitions";
+import { escapeLike, SESSIONS_PAGE_MAX, SESSIONS_PAGE_SIZE } from "./lib/session-list";
 import { SESSIONS_PER_DAY, sessionInsertStatement } from "./lib/session-quota";
 import type { ProgressEvent, ProgressRow, SessionImage } from "./lib/types";
 
@@ -231,19 +232,40 @@ export interface SessionRowWithStatus extends SessionRow {
   owner_email: string | null;
 }
 
-export async function listSessionsForUser(userId: string, allowedProjects: string[] | null) {
-  if (allowedProjects && allowedProjects.length === 0) return [];
-  const stmt =
-    allowedProjects === null
-      ? `${listSessionsBase} ORDER BY s.created_at DESC`
-      : `${listSessionsBase} WHERE s.owner_id = ? AND s.project IN (${allowedProjects.map(() => "?").join(", ")}) ORDER BY s.created_at DESC`;
-  const { results } = await (allowedProjects === null
-    ? env().DB.prepare(stmt)
-    : env()
-        .DB.prepare(stmt)
-        .bind(userId, ...allowedProjects)
-  ).all<SessionRowWithStatus>();
-  return results ?? [];
+export async function listSessionsForUser(
+  userId: string,
+  allowedProjects: string[] | null,
+  options: { limit?: number; offset?: number; query?: string } = {},
+): Promise<{ sessions: SessionRowWithStatus[]; hasMore: boolean }> {
+  const limit = Math.min(Math.max(options.limit ?? SESSIONS_PAGE_SIZE, 1), SESSIONS_PAGE_MAX);
+  const offset = Math.max(options.offset ?? 0, 0);
+  const query = (options.query ?? "").trim().slice(0, 100);
+  if (allowedProjects && allowedProjects.length === 0) return { sessions: [], hasMore: false };
+
+  const where: string[] = [];
+  const binds: (string | number)[] = [];
+  if (allowedProjects !== null) {
+    where.push("s.owner_id = ?");
+    binds.push(userId);
+    where.push(`s.project IN (${allowedProjects.map(() => "?").join(", ")})`);
+    binds.push(...allowedProjects);
+  }
+  if (query) {
+    const pattern = `%${escapeLike(query)}%`;
+    where.push("(s.title LIKE ? ESCAPE '\\' OR s.project LIKE ? ESCAPE '\\')");
+    binds.push(pattern, pattern);
+  }
+
+  const stmt = `${listSessionsBase}
+    ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+    ORDER BY s.created_at DESC
+    LIMIT ? OFFSET ?`;
+  const { results } = await env()
+    .DB.prepare(stmt)
+    .bind(...binds, limit + 1, offset)
+    .all<SessionRowWithStatus>();
+  const rows = results ?? [];
+  return { sessions: rows.slice(0, limit), hasMore: rows.length > limit };
 }
 
 export async function getOwnerEmail(userId: string) {
