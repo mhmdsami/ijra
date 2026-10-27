@@ -25,6 +25,13 @@ export function ThreadsSidebar() {
     setPending(null);
   }, [pathname]);
 
+  // If navigation fails, the pathname never changes; do not leave the highlight stuck.
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setTimeout(() => setPending(null), 10_000);
+    return () => clearTimeout(timer);
+  }, [pending]);
+
   function toggle() {
     setOpen((v) => {
       localStorage.setItem("ijra-sidebar", v ? "0" : "1");

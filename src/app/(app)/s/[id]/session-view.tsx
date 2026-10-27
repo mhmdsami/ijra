@@ -71,6 +71,8 @@ export function SessionView({ initial }: { initial: State }) {
   const silentRun = !!lastRun && !hasAgentMessage && (lastRun.status === "answered" || lastRun.status === "no_changes");
 
   const [pollFailing, setPollFailing] = useState(false);
+  const [streamDown, setStreamDown] = useState(false);
+  const [streamKey, setStreamKey] = useState(0);
   const poll = useCallback(async () => {
     try {
       const res = await fetch(`/api/sessions/${initial.session.id}/sync`, { method: "POST" });
@@ -101,12 +103,17 @@ export function SessionView({ initial }: { initial: State }) {
     }
   }, [sessions, initial.session.id, refresh]);
 
+  // streamKey is an intentional retry trigger; the body does not read it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnect after a stream failure
   useEffect(() => {
     if (!anyActive) {
       setLive({ text: "", tools: [], stage: "" });
+      setStreamDown(false);
       return;
     }
+    let retry: ReturnType<typeof setTimeout> | undefined;
     const source = new EventSource(`/api/sessions/${initial.session.id}/stream`);
+    source.onopen = () => setStreamDown(false);
     source.onmessage = (message) => {
       let event: StreamEvent;
       try {
@@ -123,9 +130,16 @@ export function SessionView({ initial }: { initial: State }) {
         poll();
       }
     };
-    source.onerror = () => source.close();
-    return () => source.close();
-  }, [anyActive, initial.session.id, poll]);
+    source.onerror = () => {
+      source.close();
+      setStreamDown(true);
+      retry = setTimeout(() => setStreamKey((key) => key + 1), 3_000);
+    };
+    return () => {
+      source.close();
+      if (retry) clearTimeout(retry);
+    };
+  }, [anyActive, initial.session.id, poll, streamKey]);
 
   useEffect(() => {
     if (!anyActive) return;
@@ -354,9 +368,11 @@ export function SessionView({ initial }: { initial: State }) {
               <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />
             </div>
           )}
-          {anyActive && pollFailing && (
+          {anyActive && (pollFailing || streamDown) && (
             <p role="status" className="text-2xs text-text-tertiary">
-              Live updates are failing. The run continues on GitHub.
+              {pollFailing
+                ? "Live updates are failing. The run continues on GitHub."
+                : "Live output paused. Status still updates."}
             </p>
           )}
           {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
@@ -502,20 +518,37 @@ export function SessionView({ initial }: { initial: State }) {
 
 function Quota({ refreshKey }: { refreshKey?: number }) {
   const [quota, setQuota] = useState<{ used: number; limit: number | null } | null>(null);
+  const [failed, setFailed] = useState(false);
   // refreshKey is an intentional trigger; the effect does not read it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: refetch on a new run count
   useEffect(() => {
     let live = true;
-    fetch("/api/quota")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((q) => {
-        if (live && q) setQuota(q as { used: number; limit: number | null });
-      })
-      .catch(() => {});
+    const load = async () => {
+      try {
+        const response = await fetch("/api/quota");
+        if (!response.ok) throw new Error(String(response.status));
+        const data = (await response.json()) as { used: number; limit: number | null };
+        if (live) {
+          setQuota(data);
+          setFailed(false);
+        }
+      } catch {
+        if (live) setFailed(true);
+      }
+    };
+    void load();
+    const timer = setInterval(load, 60_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       live = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [refreshKey]);
+  if (failed) return <span role="status">usage unavailable</span>;
   if (!quota || quota.limit === null) return null;
   return (
     <span>
