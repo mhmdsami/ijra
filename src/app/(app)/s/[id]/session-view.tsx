@@ -1,44 +1,59 @@
 "use client";
 
-import Link from "next/link";
 import { MessageSquarePlus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { HeaderActions } from "@/app/header-actions";
+import { ComposerControls } from "@/components/composer-controls";
+import { EmptyState } from "@/components/empty-state";
+import { AttachButton, AttachmentTray, uploadImages, useImageQueue } from "@/components/image-attachments";
+import { MobileThreads } from "@/components/mobile-threads";
+import { useSessions } from "@/components/sessions-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { HeaderActions } from "@/app/header-actions";
-import { MobileThreads } from "@/components/mobile-threads";
 import { Wordmark } from "@/components/wordmark";
-import { EmptyState } from "@/components/empty-state";
-import { ComposerControls } from "@/components/composer-controls";
-import { AttachmentTray, AttachButton, uploadImages, useImageQueue } from "@/components/image-attachments";
-import { useSessions } from "@/components/sessions-context";
+import type { MessageRow, RunRow, SessionRow } from "@/db";
 import { projectConfig } from "@/lib/projects";
 import { canRetry } from "@/lib/runner/transitions";
-import { cn } from "@/lib/utils";
-import type { MessageRow, RunRow, SessionRow } from "@/db";
 import type { StreamEvent } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 type RunResult = { ok: boolean; error?: string };
 
-type State = { session: SessionRow; messages: MessageRow[]; runs: RunRow[]; ownerEmail: string | null; viewerId: string; canWrite: boolean; isAdmin: boolean; models: { id: string; label: string; vision: boolean }[]; defaultModel: string };
+type State = {
+  session: SessionRow;
+  messages: MessageRow[];
+  runs: RunRow[];
+  ownerEmail: string | null;
+  viewerId: string;
+  canWrite: boolean;
+  isAdmin: boolean;
+  models: { id: string; label: string; vision: boolean }[];
+  defaultModel: string;
+};
 const ACTIVE = new Set(["dispatching", "running"]);
 
 export function SessionView({ initial }: { initial: State }) {
   const [state, setState] = useState(initial);
   const [input, setInput] = useState("");
   const lastRunModel = [...initial.runs].reverse().find((run) => run.model)?.model;
-  const startingModel = lastRunModel && initial.models.some((m) => m.id === lastRunModel) ? lastRunModel : initial.defaultModel;
+  const startingModel =
+    lastRunModel && initial.models.some((m) => m.id === lastRunModel) ? lastRunModel : initial.defaultModel;
   const [model, setModel] = useState<string>(startingModel);
   const [sending, setSending] = useState(false);
   const imageQueue = useImageQueue();
   const modelSupportsImages = state.models.find((m) => m.id === model)?.vision ?? false;
   const [sendError, setSendError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
-  const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({ text: "", tools: [], stage: "" });
+  const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({
+    text: "",
+    tools: [],
+    stage: "",
+  });
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { sessions, refresh } = useSessions();
@@ -48,7 +63,9 @@ export function SessionView({ initial }: { initial: State }) {
   const anyReview = state.runs.some((r) => r.status === "awaiting_review");
   const activeRun = state.runs.find((r) => ACTIVE.has(r.status));
   const dispatchAt = activeRun?.dispatch_at ?? 0;
-  const latestRun = [...state.runs].reverse().find((r) => !ACTIVE.has(r.status) && (r.pr_url || r.status === "blocked"));
+  const latestRun = [...state.runs]
+    .reverse()
+    .find((r) => !ACTIVE.has(r.status) && (r.pr_url || r.status === "blocked"));
   const lastRun = state.runs.at(-1);
   const hasAgentMessage = state.messages.some((m) => m.role === "agent");
   const silentRun = !!lastRun && !hasAgentMessage && (lastRun.status === "answered" || lastRun.status === "no_changes");
@@ -56,7 +73,7 @@ export function SessionView({ initial }: { initial: State }) {
   const [pollFailing, setPollFailing] = useState(false);
   const poll = useCallback(async () => {
     try {
-      const res = await fetch(`/api/sessions/${initial.session.id}`, { cache: "no-store" });
+      const res = await fetch(`/api/sessions/${initial.session.id}/sync`, { method: "POST" });
       if (!res.ok) throw new Error(String(res.status));
       const data = (await res.json()) as Pick<State, "messages" | "runs">;
       setPollFailing(false);
@@ -98,7 +115,8 @@ export function SessionView({ initial }: { initial: State }) {
         return;
       }
       if (event.type === "text") setLive((current) => ({ ...current, text: (current.text + event.text).slice(-4000) }));
-      else if (event.type === "tool") setLive((current) => ({ ...current, tools: [...current.tools, event.text].slice(-6) }));
+      else if (event.type === "tool")
+        setLive((current) => ({ ...current, tools: [...current.tools, event.text].slice(-6) }));
       else if (event.type === "stage") setLive((current) => ({ ...current, stage: event.text }));
       else if (event.type === "done") {
         source.close();
@@ -136,6 +154,8 @@ export function SessionView({ initial }: { initial: State }) {
     };
   }, [anyActive, dispatchAt, poll]);
 
+  // Re-run when the message count changes; the body only needs the ref.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages
   useEffect(() => {
     const scroller = bottomRef.current?.parentElement;
     if (!scroller) return;
@@ -151,26 +171,62 @@ export function SessionView({ initial }: { initial: State }) {
     setInput("");
     setState((s) => ({
       ...s,
-      messages: [...s.messages, { id: -Date.now(), session_id: s.session.id, role: "user", content, meta: null, created_at: Date.now() }],
-      runs: [...s.runs, { id: "pending", session_id: s.session.id, project: s.session.project, request: content, model, mode: initial.canWrite ? "auto" : "ask", status: "dispatching", gh_run_id: null, gh_run_url: null, pr_url: null, branch: null, safe_zone: null, agent_msg: 0, dispatch_at: Date.now(), updated_at: Date.now(), requested_by: null, parent_run_id: null, policy_status: "pending", policy_reasons: null, checks_status: null, decision: null, decided_by: null, decided_at: null, decision_reason: null, error_detail: null }],
+      messages: [
+        ...s.messages,
+        { id: -Date.now(), session_id: s.session.id, role: "user", content, meta: null, created_at: Date.now() },
+      ],
+      runs: [
+        ...s.runs,
+        {
+          id: "pending",
+          session_id: s.session.id,
+          project: s.session.project,
+          request: content,
+          model,
+          mode: initial.canWrite ? "auto" : "ask",
+          status: "dispatching",
+          gh_run_id: null,
+          gh_run_url: null,
+          pr_url: null,
+          branch: null,
+          safe_zone: null,
+          agent_msg: 0,
+          dispatch_at: Date.now(),
+          updated_at: Date.now(),
+          requested_by: null,
+          parent_run_id: null,
+          policy_status: "pending",
+          policy_reasons: null,
+          checks_status: null,
+          decision: null,
+          decided_by: null,
+          decided_at: null,
+          decision_reason: null,
+          error_detail: null,
+        },
+      ],
     }));
     try {
       const imageIds = imageQueue.images.length > 0 ? await uploadImages(initial.session.id, imageQueue.images) : [];
       const res = await fetch(`/api/sessions/${initial.session.id}/messages`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content, model, imageIds }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content, model, imageIds }),
       });
       if (res.ok) {
         const data = (await res.json()) as Pick<State, "messages" | "runs">;
         setState((state) => ({ ...state, ...data }));
         imageQueue.clear();
       } else {
-        const body = await res.json().catch(() => null) as { error?: string } | null;
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setInput((current) => (current.trim() === "" ? content : current));
         setSendError(body?.error ?? "Unable to send request.");
       }
     } catch (e) {
       setInput((current) => (current.trim() === "" ? content : current));
-      setSendError(e instanceof Error && e.message ? e.message : "Unable to send request. Check your connection and try again.");
+      setSendError(
+        e instanceof Error && e.message ? e.message : "Unable to send request. Check your connection and try again.",
+      );
     } finally {
       setSending(false);
       poll();
@@ -187,7 +243,11 @@ export function SessionView({ initial }: { initial: State }) {
     poll();
   }
 
-  async function runAction(runId: string, action: "merge" | "reject" | "retry", body?: Record<string, unknown>): Promise<RunResult> {
+  async function runAction(
+    runId: string,
+    action: "merge" | "reject" | "retry",
+    body?: Record<string, unknown>,
+  ): Promise<RunResult> {
     if (runId === "pending") return { ok: false, error: "The run has not started yet." };
     setActing(runId);
     try {
@@ -237,9 +297,17 @@ export function SessionView({ initial }: { initial: State }) {
             {state.session.project}
           </Link>
           {state.session.owner_id && state.session.owner_id !== state.viewerId && state.ownerEmail && (
-            <span className="hidden truncate text-2xs text-text-tertiary sm:inline" title="Session owner">{state.ownerEmail}</span>
+            <span className="hidden truncate text-2xs text-text-tertiary sm:inline" title="Session owner">
+              {state.ownerEmail}
+            </span>
           )}
-          <Button onClick={deleteThread} variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-destructive" aria-label="Delete thread">
+          <Button
+            onClick={deleteThread}
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground hover:text-destructive"
+            aria-label="Delete thread"
+          >
             <Trash2 className="size-3.5" />
           </Button>
           <HeaderActions />
@@ -253,7 +321,11 @@ export function SessionView({ initial }: { initial: State }) {
             <EmptyState
               icon={MessageSquarePlus}
               title="Describe the change."
-              description={initial.canWrite ? "The agent works in the repo and opens a pull request for review." : "Ask questions about this repository. Changes need a project grant."}
+              description={
+                initial.canWrite
+                  ? "The agent works in the repo and opens a pull request for review."
+                  : "Ask questions about this repository. Changes need a project grant."
+              }
               action={
                 <div className="flex flex-wrap justify-center gap-2">
                   {["Fix a failing test", "Explain this folder", "Update a dependency"].map((suggestion) => (
@@ -274,66 +346,135 @@ export function SessionView({ initial }: { initial: State }) {
               className="flex-1 justify-center py-8"
             />
           )}
-          {state.messages.map((m, index) => <Message key={m.id} index={index} role={m.role} content={m.content} meta={m.meta} />)}
+          {state.messages.map((m, index) => (
+            <Message key={m.id} index={index} role={m.role} content={m.content} meta={m.meta} />
+          ))}
           {anyActive && (
             <div role="status">
               <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />
             </div>
           )}
           {anyActive && pollFailing && (
-            <p role="status" className="text-2xs text-text-tertiary">Live updates are failing. The run continues on GitHub.</p>
+            <p role="status" className="text-2xs text-text-tertiary">
+              Live updates are failing. The run continues on GitHub.
+            </p>
           )}
           {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
-            <div role="log" aria-label="Live agent output" className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-surface-1/60 p-3">
+            <div
+              role="log"
+              aria-label="Live agent output"
+              className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-surface-1/60 p-3"
+            >
               {live.tools.length > 0 && (
                 <div className="flex flex-col gap-0.5 font-mono text-2xs text-text-tertiary">
-                  {live.tools.map((tool, index) => <span key={`${index}-${tool}`} className="truncate">› {tool}</span>)}
+                  {live.tools.map((tool, index) => (
+                    <span key={`${index}-${tool}`} className="truncate">
+                      › {tool}
+                    </span>
+                  ))}
                 </div>
               )}
               {live.text.length > 0 && (
-                <p className="max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">{live.text}</p>
+                <p className="max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">
+                  {live.text}
+                </p>
               )}
             </div>
           )}
-          {!anyActive && <PrCard run={latestRun} isAdmin={initial.isAdmin} onAction={runAction} busy={acting === latestRun?.id} />}
+          {!anyActive && (
+            <PrCard run={latestRun} isAdmin={initial.isAdmin} onAction={runAction} busy={acting === latestRun?.id} />
+          )}
           <div ref={bottomRef} />
         </div>
 
         <div className="shrink-0 pb-4 pl-4 pr-4 pt-2 sm:pb-5 sm:pl-6 sm:pr-0">
-          {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
+          {sendError && (
+            <p role="alert" className="mb-2 text-xs text-destructive">
+              {sendError}
+            </p>
+          )}
           {(silentRun || lastRun?.status === "failed" || lastRun?.status === "cancelled") && (
             <div className="mb-2 space-y-1.5">
               <p role="status" className="text-xs text-destructive">
-                {lastRun?.status === "failed" ? "The run failed." : lastRun?.status === "cancelled" ? "The run was cancelled." : "The run finished without a reply."}
+                {lastRun?.status === "failed"
+                  ? "The run failed."
+                  : lastRun?.status === "cancelled"
+                    ? "The run was cancelled."
+                    : "The run finished without a reply."}
                 {lastRun?.status === "failed" && !initial.isAdmin ? " Ask an admin to check the run logs." : ""}
                 {lastRun?.gh_run_url && (
-                  <> <a href={lastRun.gh_run_url} target="_blank" rel="noreferrer" className="underline underline-offset-4 hover:text-foreground">Open the run logs</a></>
+                  <>
+                    {" "}
+                    <a
+                      href={lastRun.gh_run_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-4 hover:text-foreground"
+                    >
+                      Open the run logs
+                    </a>
+                  </>
                 )}
               </p>
               {initial.isAdmin && lastRun && canRetry(lastRun.status) && (
-                <Button size="xs" variant="outline" onClick={() => runAction(lastRun.id, "retry")} disabled={acting === lastRun.id}>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => runAction(lastRun.id, "retry")}
+                  disabled={acting === lastRun.id}
+                >
                   {acting === lastRun.id ? "Retrying…" : "Retry"}
                 </Button>
               )}
               {initial.isAdmin && lastRun?.error_detail && (
                 <details className="rounded-md border bg-card px-3 py-2">
                   <summary className="cursor-pointer text-2xs text-text-tertiary">Error details</summary>
-                  <pre className="mt-2 max-h-48 overflow-auto font-mono text-2xs whitespace-pre-wrap break-words text-destructive">{lastRun.error_detail}</pre>
+                  <pre className="mt-2 max-h-48 overflow-auto font-mono text-2xs whitespace-pre-wrap break-words text-destructive">
+                    {lastRun.error_detail}
+                  </pre>
                 </details>
               )}
             </div>
           )}
           <div className="rounded-xl border bg-card p-2.5 shadow-card sm:p-3">
             <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
-            <Textarea value={input} id="composer-input" onChange={(e) => { setInput(e.target.value); setSendError(null); }} onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); }
-            }} onPaste={(e) => {
-              const files = [...e.clipboardData.items].filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => !!file);
-              if (files.length > 0 && modelSupportsImages) { e.preventDefault(); imageQueue.add(files); }
-            }} placeholder="Ask a question or describe a change" rows={2} aria-label="Message to ijra" className="min-h-10 w-full resize-none border-0 bg-transparent px-1.5 py-1 text-base leading-6 shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5" />
+            <Textarea
+              value={input}
+              id="composer-input"
+              onChange={(e) => {
+                setInput(e.target.value);
+                setSendError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              onPaste={(e) => {
+                const files = [...e.clipboardData.items]
+                  .filter((item) => item.kind === "file")
+                  .map((item) => item.getAsFile())
+                  .filter((file): file is File => !!file);
+                if (files.length > 0 && modelSupportsImages) {
+                  e.preventDefault();
+                  imageQueue.add(files);
+                }
+              }}
+              placeholder="Ask a question or describe a change"
+              rows={2}
+              aria-label="Message to ijra"
+              className="min-h-10 w-full resize-none border-0 bg-transparent px-1.5 py-1 text-base leading-6 shadow-none focus-visible:ring-0 sm:min-h-12 sm:px-2 sm:py-1.5"
+            />
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2.5 text-2xs text-text-tertiary">
-              {modelSupportsImages && <AttachButton onFiles={imageQueue.add} disabled={sending || imageQueue.images.length >= 3} />}
-              <span className={cn("hidden transition-opacity duration-150 sm:inline", input ? "opacity-0" : "opacity-100")}>Enter to send</span>
+              {modelSupportsImages && (
+                <AttachButton onFiles={imageQueue.add} disabled={sending || imageQueue.images.length >= 3} />
+              )}
+              <span
+                className={cn("hidden transition-opacity duration-150 sm:inline", input ? "opacity-0" : "opacity-100")}
+              >
+                Enter to send
+              </span>
               <Quota refreshKey={state.runs.length} />
               <span className="ml-auto max-[380px]:ml-0 max-[380px]:w-full">
                 <ComposerControls
@@ -348,7 +489,11 @@ export function SessionView({ initial }: { initial: State }) {
               </span>
             </div>
           </div>
-          {imageQueue.error && <p role="alert" className="mt-2 text-xs text-destructive">{imageQueue.error}</p>}
+          {imageQueue.error && (
+            <p role="alert" className="mt-2 text-xs text-destructive">
+              {imageQueue.error}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -357,34 +502,58 @@ export function SessionView({ initial }: { initial: State }) {
 
 function Quota({ refreshKey }: { refreshKey?: number }) {
   const [quota, setQuota] = useState<{ used: number; limit: number | null } | null>(null);
+  // refreshKey is an intentional trigger; the effect does not read it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refetch on a new run count
   useEffect(() => {
     let live = true;
     fetch("/api/quota")
       .then((r) => (r.ok ? r.json() : null))
-      .then((q) => { if (live && q) setQuota(q as { used: number; limit: number | null }); })
+      .then((q) => {
+        if (live && q) setQuota(q as { used: number; limit: number | null });
+      })
       .catch(() => {});
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [refreshKey]);
   if (!quota || quota.limit === null) return null;
-  return <span>{quota.used}/{quota.limit} used today</span>;
+  return (
+    <span>
+      {quota.used}/{quota.limit} used today
+    </span>
+  );
 }
 
-function Message({ role, content, meta, index }: { role: string; content: string; meta?: string | null; index: number }) {
+function Message({
+  role,
+  content,
+  meta,
+  index,
+}: {
+  role: string;
+  content: string;
+  meta?: string | null;
+  index: number;
+}) {
   const isUser = role === "user";
   let imageIds: string[] = [];
   try {
     const parsed = meta ? (JSON.parse(meta) as { imageIds?: string[] }) : null;
     if (Array.isArray(parsed?.imageIds)) imageIds = parsed.imageIds.filter((id) => typeof id === "string");
-  } catch {
-  }
+  } catch {}
   return (
-    <article className={cn("animate-fade-up flex flex-col", isUser ? "items-end" : "items-stretch")} style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
+    <article
+      className={cn("animate-fade-up flex flex-col", isUser ? "items-end" : "items-stretch")}
+      style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}
+    >
       <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
       {isUser ? (
         <div className="max-w-[85%] rounded-xl border bg-surface-2 px-4 py-3">
           {imageIds.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2">
-              {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
+              {imageIds.map((id) => (
+                <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />
+              ))}
             </div>
           )}
           <div className="text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
@@ -409,14 +578,19 @@ function Markdown({ text }: { text: string }) {
 function StatusLine({ runs, onCancel, stage }: { runs: RunRow[]; onCancel: () => void; stage?: string }) {
   const latest = runs.at(-1);
   if (!latest) return null;
-  const base = latest.status === "dispatching" ? "Dispatching request" : latest.status === "running" ? "Agent is working" : null;
+  const base =
+    latest.status === "dispatching" ? "Dispatching request" : latest.status === "running" ? "Agent is working" : null;
   const label = stage ? `${base}: ${stage}` : base;
   if (!label) return null;
   return (
     <div className="animate-fade-up flex items-center gap-2 text-xs text-primary">
       <span className="size-1.5 animate-pulse rounded-full bg-primary" />
       {label}
-      <button onClick={onCancel} className="ml-1 text-text-tertiary underline underline-offset-4 transition-colors hover:text-foreground">
+      <button
+        type="button"
+        onClick={onCancel}
+        className="ml-1 text-text-tertiary underline underline-offset-4 transition-colors hover:text-foreground"
+      >
         cancel
       </button>
     </div>
@@ -434,7 +608,12 @@ function shortReason(reason: string) {
   return `${reason.slice(0, idx)}: ${paths}`;
 }
 
-function PrCard({ run, isAdmin, onAction, busy }: {
+function PrCard({
+  run,
+  isAdmin,
+  onAction,
+  busy,
+}: {
   run: RunRow | undefined;
   isAdmin: boolean;
   onAction: (runId: string, action: "merge" | "reject" | "retry", body?: Record<string, unknown>) => Promise<RunResult>;
@@ -446,20 +625,26 @@ function PrCard({ run, isAdmin, onAction, busy }: {
   if (!run || (!run.pr_url && run.status !== "blocked")) return null;
 
   const label =
-    run.status === "awaiting_review" ? "Awaiting review"
-    : run.status === "merged" ? "Merged"
-    : run.status === "rejected" ? "Rejected"
-    : run.status === "closed" ? "Closed"
-    : run.status === "blocked" ? "Blocked"
-    : run.status === "failed" ? "Failed"
-    : run.status;
+    run.status === "awaiting_review"
+      ? "Awaiting review"
+      : run.status === "merged"
+        ? "Merged"
+        : run.status === "rejected"
+          ? "Rejected"
+          : run.status === "closed"
+            ? "Closed"
+            : run.status === "blocked"
+              ? "Blocked"
+              : run.status === "failed"
+                ? "Failed"
+                : run.status;
   const tone =
-    run.status === "awaiting_review" ? "text-primary"
-    : run.status === "merged" ? "text-primary"
-    : "text-text-tertiary";
+    run.status === "awaiting_review" ? "text-primary" : run.status === "merged" ? "text-primary" : "text-text-tertiary";
 
   let reasons: string[] = [];
-  try { reasons = run.policy_reasons ? JSON.parse(run.policy_reasons) : []; } catch {}
+  try {
+    reasons = run.policy_reasons ? JSON.parse(run.policy_reasons) : [];
+  } catch {}
 
   const canMerge = isAdmin && run.status === "awaiting_review" && !!run.pr_url;
   const canRetryHere = isAdmin && canRetry(run.status);
@@ -479,20 +664,31 @@ function PrCard({ run, isAdmin, onAction, busy }: {
     <div className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Badge variant="outline" className={cn("shrink-0 text-2xs", tone)}>{label}</Badge>
+          <Badge variant="outline" className={cn("shrink-0 text-2xs", tone)}>
+            {label}
+          </Badge>
           {run.pr_url && (
-            <a href={run.pr_url} target="_blank" rel="noreferrer" className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground">
+            <a
+              href={run.pr_url}
+              target="_blank"
+              rel="noreferrer"
+              className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground"
+            >
               {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
             </a>
           )}
-          {run.branch && <span className="hidden shrink-0 font-mono text-2xs text-text-tertiary sm:inline">{run.branch}</span>}
+          {run.branch && (
+            <span className="hidden shrink-0 font-mono text-2xs text-text-tertiary sm:inline">{run.branch}</span>
+          )}
           {run.checks_status && run.checks_status !== "none" && (
             <span
               className={cn(
                 "shrink-0 font-mono text-2xs",
-                run.checks_status === "failing" ? "text-destructive"
-                : run.checks_status === "pending" ? "text-text-tertiary"
-                : "text-primary"
+                run.checks_status === "failing"
+                  ? "text-destructive"
+                  : run.checks_status === "pending"
+                    ? "text-text-tertiary"
+                    : "text-primary",
               )}
             >
               checks {run.checks_status}
@@ -501,13 +697,35 @@ function PrCard({ run, isAdmin, onAction, busy }: {
         </div>
         {(canMerge || canRetryHere) && !rejecting && (
           <div className="flex shrink-0 items-center gap-1.5 sm:ml-auto">
-            {canMerge && <Button size="xs" onClick={() => void act("merge")} disabled={busy}>{busy ? "Merging…" : "Merge"}</Button>}
-            {canMerge && <Button size="xs" variant="ghost" onClick={() => { setRejecting(true); setError(null); }} disabled={busy}>Reject</Button>}
-            {canRetryHere && <Button size="xs" variant="outline" onClick={() => void act("retry")} disabled={busy}>{busy ? "Retrying…" : "Retry"}</Button>}
+            {canMerge && (
+              <Button size="xs" onClick={() => void act("merge")} disabled={busy}>
+                {busy ? "Merging…" : "Merge"}
+              </Button>
+            )}
+            {canMerge && (
+              <Button
+                size="xs"
+                variant="ghost"
+                onClick={() => {
+                  setRejecting(true);
+                  setError(null);
+                }}
+                disabled={busy}
+              >
+                Reject
+              </Button>
+            )}
+            {canRetryHere && (
+              <Button size="xs" variant="outline" onClick={() => void act("retry")} disabled={busy}>
+                {busy ? "Retrying…" : "Retry"}
+              </Button>
+            )}
           </div>
         )}
         {!canMerge && !canRetryHere && reasons.length > 0 && (
-          <span className="text-2xs text-text-tertiary sm:ml-auto" title={reasons[0]}>{shortReason(reasons[0])}</span>
+          <span className="text-2xs text-text-tertiary sm:ml-auto" title={reasons[0]}>
+            {shortReason(reasons[0])}
+          </span>
         )}
       </div>
       {run.status === "rejected" && run.decision_reason && (
@@ -531,12 +749,29 @@ function PrCard({ run, isAdmin, onAction, busy }: {
             autoFocus
           />
           <div className="flex items-center gap-1.5">
-            <Button type="submit" size="xs" variant="destructive" disabled={!reason.trim() || busy}>{busy ? "Rejecting…" : "Reject"}</Button>
-            <Button type="button" size="xs" variant="ghost" onClick={() => { setRejecting(false); setReason(""); setError(null); }}>Cancel</Button>
+            <Button type="submit" size="xs" variant="destructive" disabled={!reason.trim() || busy}>
+              {busy ? "Rejecting…" : "Reject"}
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setRejecting(false);
+                setReason("");
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
           </div>
         </form>
       )}
-      {error && <p role="alert" className="text-2xs text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-2xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

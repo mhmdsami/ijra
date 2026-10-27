@@ -36,7 +36,7 @@ Clean changes run the project's type-check and build commands from the registry.
 
 ## Reporting
 
-The runner reports over an HMAC-signed webhook to `/api/internal/answer`. The dashboard also polls the Actions API. The webhook stores the agent reply as the chat message and sets `agent_msg`, so the poller does not duplicate it.
+The runner reports over an HMAC-signed webhook to `/api/internal/answer`. The session client triggers a sync `POST`, which polls the Actions API from the dashboard. The webhook stores the agent reply as the chat message and sets `agent_msg`, so the poller does not duplicate it.
 
 ## Checks
 

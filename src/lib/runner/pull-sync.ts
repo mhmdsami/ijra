@@ -52,13 +52,25 @@ export function pullStatusMessage(status: "merged" | "closed", prUrl: string) {
   return status === "merged" ? `Merged: ${prUrl}` : `Pull request closed without merging: ${prUrl}`;
 }
 
-const SETTLED = new Set(["done", "merged", "closed", "failed", "cancelled", "answered", "no_changes", "blocked", "rejected"]);
+const SETTLED = new Set([
+  "done",
+  "merged",
+  "closed",
+  "failed",
+  "cancelled",
+  "answered",
+  "no_changes",
+  "blocked",
+  "rejected",
+]);
 const REVIEW_SYNC_MS = 60_000;
+const ACTIVE_SYNC_MS = 5_000;
 
 export function shouldSyncRun(run: { status: string; agent_msg: number; updated_at: number }, now = Date.now()) {
   if (SETTLED.has(run.status)) return false;
   if (run.status === "awaiting_review") return now - run.updated_at >= REVIEW_SYNC_MS;
-  return !run.agent_msg;
+  if (run.agent_msg) return false;
+  return now - run.updated_at >= ACTIVE_SYNC_MS;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
