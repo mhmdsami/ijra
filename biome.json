@@ -9,7 +9,6 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
-      "!runner",
       "!.next",
       "!.open-next",
       "!.wrangler",
@@ -48,12 +47,36 @@
     }
   },
   "javascript": {
+    "globals": [
+      "process",
+      "console",
+      "Buffer",
+      "fetch",
+      "AbortSignal",
+      "URL",
+      "TextEncoder",
+      "setTimeout",
+      "clearTimeout",
+      "setInterval",
+      "clearInterval"
+    ],
     "formatter": {
       "quoteStyle": "double",
       "semicolons": "always",
       "trailingCommas": "all"
     }
   },
+  "overrides": [
+    {
+      "includes": ["runner/**"],
+      "formatter": { "enabled": false },
+      "linter": {
+        "rules": {
+          "suspicious": { "noAssignInExpressions": "off" }
+        }
+      }
+    }
+  ],
   "assist": {
     "enabled": true,
     "actions": {
