@@ -61,7 +61,7 @@ export function MobileThreads() {
         type="button"
         ref={openerRef}
         onClick={() => setOpen(true)}
-        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+        className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
         aria-label="Open threads"
       >
         <Menu className="size-4" />
@@ -88,7 +88,7 @@ export function MobileThreads() {
                 <Link
                   href="/"
                   onClick={() => setOpen(false)}
-                  className="rounded-md p-2 text-primary transition-colors hover:bg-surface-2"
+                  className="inline-flex size-11 items-center justify-center rounded-md text-primary transition-colors hover:bg-surface-2"
                   aria-label="New thread"
                 >
                   <MessageSquarePlus className="size-4" />
@@ -97,7 +97,7 @@ export function MobileThreads() {
                   type="button"
                   ref={closeRef}
                   onClick={() => setOpen(false)}
-                  className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                  className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
                   aria-label="Close threads"
                 >
                   <X className="size-4" />

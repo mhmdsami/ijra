@@ -91,7 +91,7 @@ export function AttachmentTray({ images, onRemove }: { images: PendingImage[]; o
           <button
             type="button"
             onClick={() => onRemove(image.key)}
-            className="absolute -top-1.5 -right-1.5 rounded-sm border bg-card p-0.5 text-muted-foreground transition-colors hover:text-destructive"
+            className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center rounded-sm border bg-card p-0.5 text-muted-foreground transition-colors hover:text-destructive max-sm:size-7"
             aria-label="Remove image"
           >
             <X className="size-3" />
@@ -121,7 +121,7 @@ export function AttachButton({ onFiles, disabled }: { onFiles: (files: File[]) =
         type="button"
         onClick={() => input.current?.click()}
         disabled={disabled}
-        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-40"
+        className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-40 max-sm:size-11"
         aria-label="Attach images"
       >
         <ImagePlus className="size-4" />
