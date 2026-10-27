@@ -4,6 +4,7 @@ import { PURGE_AUDIT_SQL } from "./lib/audit-retention";
 import { imageInsertStatement } from "./lib/image-storage";
 import { MAX_IMAGES_PER_SESSION } from "./lib/images";
 import { canTransition } from "./lib/runner/transitions";
+import { SESSIONS_PER_DAY, sessionInsertStatement } from "./lib/session-quota";
 import type { ProgressEvent, ProgressRow, SessionImage } from "./lib/types";
 
 export const DEFAULT_DAILY_LIMIT = 5;
@@ -254,13 +255,14 @@ export async function getSession(id: string) {
   return env().DB.prepare("SELECT * FROM sessions WHERE id = ?").bind(id).first<SessionRow>();
 }
 
-export async function createSession(project: string, ownerId: string) {
+export async function createSession(project: string, ownerId: string, dayStart: number, limit = SESSIONS_PER_DAY) {
   const id = crypto.randomUUID();
-  await env()
-    .DB.prepare("INSERT INTO sessions (id, project, owner_id, created_at) VALUES (?, ?, ?, ?)")
-    .bind(id, project, ownerId, now())
+  const { sql, binds } = sessionInsertStatement({ id, project, ownerId, createdAt: now(), dayStart, limit });
+  const result = await env()
+    .DB.prepare(sql)
+    .bind(...binds)
     .run();
-  return id;
+  return result.meta.changes === 1 ? id : null;
 }
 
 export async function addMessage(sessionId: string, role: "user" | "agent", content: string, meta?: object) {

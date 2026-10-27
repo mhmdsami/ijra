@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { appendAuditEvent, createSession, listSessionsForUser } from "@/db";
 import { requireSameOrigin } from "@/lib/csrf";
 import { projects } from "@/lib/projects";
+import { SESSIONS_PER_DAY } from "@/lib/session-quota";
 import { canAccessProject, requireUser } from "@/lib/user";
 
 export async function GET() {
@@ -24,7 +25,12 @@ export async function POST(req: Request) {
   if (!canAccessProject(user, project)) {
     return NextResponse.json({ error: "no access to this project" }, { status: 403 });
   }
-  const id = await createSession(project, user.id);
+  const dayStart = new Date();
+  dayStart.setUTCHours(0, 0, 0, 0);
+  const id = await createSession(project, user.id, dayStart.getTime());
+  if (!id) {
+    return NextResponse.json({ error: `daily thread limit reached (${SESSIONS_PER_DAY})` }, { status: 429 });
+  }
   await appendAuditEvent({ sessionId: id, actorId: user.id, action: "session.created", metadata: { project } });
   return NextResponse.json({ id });
 }
