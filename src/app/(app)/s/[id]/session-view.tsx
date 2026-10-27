@@ -246,9 +246,9 @@ export function SessionView({ initial }: { initial: State }) {
         </div>
       </header>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 sm:px-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-[45rem] flex-1 flex-col">
         {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto py-6 sm:gap-7 sm:py-10">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-6 [scrollbar-gutter:stable] sm:gap-7 sm:px-6 sm:py-10">
           {state.messages.length === 0 && (
             <EmptyState
               icon={MessageSquarePlus}
@@ -299,7 +299,7 @@ export function SessionView({ initial }: { initial: State }) {
           <div ref={bottomRef} />
         </div>
 
-        <div className="shrink-0 pt-2 pb-4 sm:pb-5">
+        <div className="shrink-0 pb-4 pl-4 pr-4 pt-2 sm:pb-5 sm:pl-6 sm:pr-0">
           {sendError && <p role="alert" className="mb-2 text-xs text-destructive">{sendError}</p>}
           {(silentRun || lastRun?.status === "failed" || lastRun?.status === "cancelled") && (
             <div className="mb-2 space-y-1.5">
@@ -378,19 +378,21 @@ function Message({ role, content, meta, index }: { role: string; content: string
   } catch {
   }
   return (
-    <article className="animate-fade-up border-l border-border pl-4" style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
+    <article className={cn("animate-fade-up flex flex-col", isUser ? "items-end" : "items-stretch")} style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}>
       <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
       {isUser ? (
-        <>
+        <div className="max-w-[85%] rounded-xl border bg-surface-2 px-4 py-3">
           {imageIds.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-2">
               {imageIds.map((id) => <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />)}
             </div>
           )}
           <div className="text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
-        </>
+        </div>
       ) : (
-        <Markdown text={content} />
+        <div className="border-l border-border pl-4">
+          <Markdown text={content} />
+        </div>
       )}
     </article>
   );
