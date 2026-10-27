@@ -6,7 +6,7 @@ The runner is a private GitHub repo: one Actions workflow and `run-request.mjs`.
 
 1. Copy the `runner/` folder into a private repo.
 2. Rename `registry.example.json` to `registry.json`, and `.github/workflows/dispatch.example.yml` to `.github/workflows/dispatch.yml`.
-3. Fill `registry.json` with target repos, install and verify commands, `safePaths`, and allowed models.
+3. Fill `registry.json` with target repos, install and verify commands, `safePaths`, allowed models, and an optional `reviewer` GitHub login.
 4. Create a GitHub App with Contents and Pull requests read/write access, installed on the target repos.
 5. Set repository secrets: `APP_ID`, `APP_PRIVATE_KEY`, `OPENCODE_API_KEY`, and `IJRA_RUNNER_KEY`.
 6. Every target repo must have an `AGENTS.md`. The runner refuses to run without one and injects it into the prompt.
@@ -32,7 +32,7 @@ A failed check marks the run blocked. The runner never merges; admins merge from
 
 ## Verification and PRs
 
-Clean changes run the project's type-check and build commands from the registry. Commits go through the Git data API, which produces GitHub-signed commits, then the PR is opened and waits for review. The dashboard records the PR URL and branch on the run.
+Clean changes run the project's type-check and build commands from the registry. Commits go through the Git data API, which produces GitHub-signed commits, then the PR is opened and waits for review. When the project sets `reviewer`, the runner requests that GitHub user as a reviewer, which triggers their review-request notifications (including the GitHub mobile app). The dashboard records the PR URL and branch on the run.
 
 ## Reporting
 

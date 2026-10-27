@@ -1,6 +1,7 @@
 {
   "my-app": {
     "repo": "you/my-app",
+    "reviewer": "your-github-login",
     "cloneUrl": "https://github.com/you/my-app.git",
     "pm": "npm",
     "install": [

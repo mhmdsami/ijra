@@ -3,6 +3,6 @@
 Copy this folder into your private runs repo (see the ijra README for setup). Files named `*.example.*` are templates; rename them when you copy:
 
 - `run-request.mjs`: the agent run script
-- `registry.example.json` to `registry.json`: project specifics (repos, install/verify, `safePaths`). Keep `safePaths` as explicit directory allowlists; protected paths (dependencies, CI, migrations, `src/lib`, `src/app/api`, auth) always need manual review.
+- `registry.example.json` to `registry.json`: project specifics (repos, install/verify, `safePaths`, optional `reviewer`). Keep `safePaths` as explicit directory allowlists; protected paths (dependencies, CI, migrations, `src/lib`, `src/app/api`, auth) always need manual review.
 - `.github/workflows/dispatch.example.yml` to `.github/workflows/dispatch.yml`: the workflow the dashboard dispatches
 - `skills/`: skills injected into the agent

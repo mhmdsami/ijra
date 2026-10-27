@@ -576,6 +576,18 @@ try {
   const prUrl = sh(`gh pr view ${shq(branch)} --repo ${cfg.repo} --json url -q .url`, "pr-url", { env: { ...cleanEnv, GH_TOKEN } }).stdout.trim();
   outcome.prUrl = prUrl;
 
+  const prNumber = prUrl.match(/\/pull\/(\d+)/)?.[1];
+  if (cfg.reviewer && prNumber) {
+    try {
+      await api(`/pulls/${prNumber}/requested_reviewers`, {
+        method: "POST",
+        body: JSON.stringify({ reviewers: [cfg.reviewer] }),
+      });
+    } catch (error) {
+      console.error(`runner: could not request review from ${cfg.reviewer}: ${error?.message ?? error}`);
+    }
+  }
+
   outcome.status = "awaiting_review";
   emitProgress("stage", `pull request opened: ${prUrl}`);
   await finish(0);
