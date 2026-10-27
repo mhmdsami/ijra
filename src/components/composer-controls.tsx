@@ -25,7 +25,7 @@ export function ComposerControls({
       <select
         value={model}
         onChange={(e) => onModel(e.target.value)}
-        className="w-36 min-w-0 flex-1 cursor-pointer appearance-none truncate rounded-md bg-transparent py-1.5 pr-1 pl-2 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground max-sm:h-11 sm:w-44 sm:flex-none"
+        className="w-36 min-w-0 flex-1 cursor-pointer appearance-none truncate rounded-md bg-transparent py-1.5 pr-1 pl-2 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground sm:w-44 sm:flex-none"
         aria-label="Model"
       >
         {models.map((m) => (
@@ -38,7 +38,7 @@ export function ComposerControls({
         type="button"
         onClick={onSend}
         disabled={disabled || busy}
-        className="inline-flex shrink-0 items-center justify-center rounded-md p-1.5 text-foreground transition-[background-color,transform,opacity] hover:bg-surface-3 active:scale-95 disabled:opacity-40 max-sm:size-11"
+        className="shrink-0 rounded-md p-1.5 text-foreground transition-[background-color,transform,opacity] hover:bg-surface-3 active:scale-95 disabled:opacity-40"
         aria-label="Send request"
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
