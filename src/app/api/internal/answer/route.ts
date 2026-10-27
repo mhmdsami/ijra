@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { addMessage, appendAuditEvent, clearProgress, getRun, touchSessionTitle, updateRun } from "@/db";
+import {
+  addMessage,
+  appendAuditEvent,
+  claimRunMessage,
+  clearProgress,
+  getRun,
+  touchSessionTitle,
+  updateRun,
+} from "@/db";
 import { env } from "@/env";
 import { PRUNE_CALLBACKS_SQL, RECORD_CALLBACK_SQL, REPLAY_TTL_MS } from "@/lib/runner/replay";
 import { acceptsReport, parseRunnerReport, reportFingerprint, reportMessage, reportStatus } from "@/lib/runner/report";
@@ -43,7 +51,6 @@ export async function POST(req: Request) {
     status,
     pr_url: payload.outcome?.prUrl ?? null,
     branch: payload.outcome?.branch ?? null,
-    agent_msg: visible ? 1 : 0,
     policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed",
     policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []),
     input_tokens: usage.input,
@@ -54,7 +61,7 @@ export async function POST(req: Request) {
     model_calls: usage.modelCalls,
     error_detail: errorDetail,
   });
-  if (visible) await addMessage(run.session_id, "agent", visible);
+  if (visible && (await claimRunMessage(run.id))) await addMessage(run.session_id, "agent", visible);
   await clearProgress(run.id);
   const title = payload.outcome?.title?.trim();
   if (title) await touchSessionTitle(run.session_id, title.slice(0, 80));

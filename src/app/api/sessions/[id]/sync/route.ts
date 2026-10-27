@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addMessage, getMessages, getRuns, getSession, touchRun, updateRun } from "@/db";
+import { addMessage, claimRunMessage, getMessages, getRuns, getSession, touchRun } from "@/db";
 import { requireSameOrigin } from "@/lib/csrf";
 import { syncRun } from "@/lib/runner";
 import { shouldSyncRun } from "@/lib/runner/pull-sync";
@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!session || !canAccessSession(user, session)) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const runs = await getRuns(id);
-  let agentMessage: string | null = null;
+  const agentMessages: string[] = [];
 
   for (const run of runs) {
     if (!shouldSyncRun(run)) continue;
@@ -44,17 +44,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       branch: run.branch,
     });
     await touchRun(run.id);
-    if (
-      result.changed &&
-      MESSAGE_STATUSES.has(result.status) &&
-      (result.status === "merged" || result.status === "closed" || !run.agent_msg)
-    ) {
-      agentMessage = renderAgentMessage(result);
-      await updateRun(run.id, { agent_msg: 1 });
+    if (result.changed && MESSAGE_STATUSES.has(result.status)) {
+      if (await claimRunMessage(run.id)) agentMessages.push(renderAgentMessage(result));
     }
   }
 
-  if (agentMessage) await addMessage(id, "agent", agentMessage);
+  for (const message of agentMessages) await addMessage(id, "agent", message);
   const finalRuns = await getRuns(id);
   return NextResponse.json({
     messages: await getMessages(id),

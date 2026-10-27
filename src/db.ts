@@ -269,7 +269,7 @@ export async function listSessionsForUser(
 
   const stmt = `${listSessionsBase}
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-    ORDER BY s.created_at DESC
+    ORDER BY s.created_at DESC, s.id DESC
     LIMIT ? OFFSET ?`;
   const { results } = await env()
     .DB.prepare(stmt)
@@ -334,6 +334,14 @@ export async function appendAuditEvent(input: {
     )
     .bind(input.runId ?? null, input.sessionId, input.actorId ?? null, input.action, metadata, now())
     .run();
+}
+
+export async function claimRunMessage(runId: string) {
+  const result = await env()
+    .DB.prepare("UPDATE runs SET agent_msg = 1 WHERE id = ? AND agent_msg = 0")
+    .bind(runId)
+    .run();
+  return result.meta.changes === 1;
 }
 
 export async function purgeAuditEvents(cutoff: number) {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addMessage, findRunByBranch, setRunStatus } from "@/db";
+import { addMessage, claimRunMessage, findRunByBranch, setRunStatus } from "@/db";
 import { env } from "@/env";
 import { validGithubSignature } from "@/lib/github-signature";
 import { projectForRepo } from "@/lib/projects";
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     branch: event.branch,
     metadata: { source: "github", delivery: event.delivery },
   });
-  if (changed && (to === "merged" || to === "closed")) {
+  if (changed && (to === "merged" || to === "closed") && (await claimRunMessage(run.id))) {
     await addMessage(run.session_id, "agent", pullStatusMessage(to, event.prUrl));
   }
   console.log(`github webhook ${event.action} ${event.repo} ${event.branch}: ${changed ? to : "no change"}`);
