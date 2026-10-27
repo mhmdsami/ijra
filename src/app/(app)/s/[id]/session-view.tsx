@@ -142,12 +142,14 @@ export function SessionView({ initial }: { initial: State }) {
   }, [anyActive, initial.session.id, poll, streamKey]);
 
   useEffect(() => {
-    if (!anyActive) return;
+    if (!anyActive && !anyReview) return;
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
+      const visible = document.visibilityState === "visible";
       const warm = Date.now() - dispatchAt < 15_000;
-      timer = setTimeout(tick, document.visibilityState === "visible" ? (warm ? 1500 : 5000) : 15_000);
+      const delay = anyActive ? (visible ? (warm ? 1500 : 5000) : 15_000) : visible ? 20_000 : 60_000;
+      timer = setTimeout(tick, delay);
     };
     const tick = async () => {
       if (!alive) return;
@@ -166,7 +168,7 @@ export function SessionView({ initial }: { initial: State }) {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [anyActive, dispatchAt, poll]);
+  }, [anyActive, anyReview, dispatchAt, poll]);
 
   // Re-run when the message count changes; the body only needs the ref.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages
@@ -735,7 +737,7 @@ function PrCard({
           )}
         </div>
         {(canMerge || canRetryHere) && !rejecting && (
-          <div className="flex shrink-0 items-center gap-1.5 sm:ml-auto">
+          <div className="flex shrink-0 items-center justify-end gap-1.5 sm:ml-auto">
             {canMerge && (
               <Button size="xs" onClick={() => void act("merge")} disabled={busy}>
                 {busy ? "Merging…" : "Merge"}
