@@ -121,7 +121,7 @@ export function AttachButton({ onFiles, disabled }: { onFiles: (files: File[]) =
         type="button"
         onClick={() => input.current?.click()}
         disabled={disabled}
-        className="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-40 max-sm:size-11"
+        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground disabled:opacity-40"
         aria-label="Attach images"
       >
         <ImagePlus className="size-4" />
