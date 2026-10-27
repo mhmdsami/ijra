@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { formatCost } from "@/lib/runner/usage";
 import { cn } from "@/lib/utils";
 import { addModelAction, removeModelAction, setDefaultModelAction } from "../actions";
 
@@ -19,7 +20,7 @@ export function ModelRow({
   stale = false,
 }: {
   model: { id: string; label: string; vision: boolean; isDefault: boolean; enabled: boolean; unavailable?: boolean };
-  usage?: { runs: number; users: number; last: number | null };
+  usage?: { runs: number; users: number; last: number | null; tokens: number; cost: number };
   stale?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -53,7 +54,7 @@ export function ModelRow({
           {stale ? " · not in catalog" : model.unavailable && " · unavailable"}
           {" · "}
           {usage
-            ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last, now ?? 0)}`
+            ? `${usage.runs} run${usage.runs === 1 ? "" : "s"} · ${usage.users} user${usage.users === 1 ? "" : "s"} · ${lastUsed(usage.last, now ?? 0)}${usage.cost > 0 ? ` · ${formatCost(usage.cost)}` : ""}`
             : lastUsed(null, now ?? 0)}
         </div>
         {actionError && (

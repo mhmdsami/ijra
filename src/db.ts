@@ -48,6 +48,12 @@ export interface RunRow {
   policy_status: string;
   policy_reasons: string | null;
   checks_status: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  cost_usd: number;
+  model_calls: number;
   decision: string | null;
   decided_by: string | null;
   decided_at: number | null;
@@ -98,16 +104,21 @@ export interface ModelUsage {
   runs: number;
   users: number;
   last: number | null;
+  tokens: number;
+  cost: number;
 }
 
 export async function modelUsage() {
   const { results } = await env()
     .DB.prepare(
-      "SELECT model, COUNT(*) AS runs, COUNT(DISTINCT requested_by) AS users, MAX(dispatch_at) AS last FROM runs GROUP BY model",
+      "SELECT model, COUNT(*) AS runs, COUNT(DISTINCT requested_by) AS users, MAX(dispatch_at) AS last, SUM(input_tokens + output_tokens) AS tokens, SUM(cost_usd) AS cost FROM runs GROUP BY model",
     )
-    .all<{ model: string; runs: number; users: number; last: number | null }>();
+    .all<{ model: string; runs: number; users: number; last: number | null; tokens: number; cost: number }>();
   return Object.fromEntries(
-    (results ?? []).map((r) => [r.model, { runs: r.runs, users: r.users, last: r.last }]),
+    (results ?? []).map((r) => [
+      r.model,
+      { runs: r.runs, users: r.users, last: r.last, tokens: r.tokens ?? 0, cost: r.cost ?? 0 },
+    ]),
   ) as Record<string, ModelUsage>;
 }
 
@@ -544,6 +555,12 @@ export async function updateRun(id: string, fields: Partial<RunRow>) {
     "policy_status",
     "policy_reasons",
     "checks_status",
+    "input_tokens",
+    "output_tokens",
+    "cache_read_tokens",
+    "cache_write_tokens",
+    "cost_usd",
+    "model_calls",
     "error_detail",
     "parent_run_id",
   ] as const;

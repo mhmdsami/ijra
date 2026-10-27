@@ -14,6 +14,7 @@ export interface RunnerReport {
     policyReasons?: string[];
     title?: string;
     error?: string;
+    usage?: unknown;
   };
 }
 

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { branchFromTitle, classifyChanges, glob } from "./policy.mjs";
+import { addUsage, branchFromTitle, classifyChanges, emptyUsage, glob } from "./policy.mjs";
 
 const session = "054ecdbe-6db9-4d4f-91cf-a38deba645cb";
 
@@ -84,4 +84,20 @@ test("strips trailing punctuation and caps the subject", () => {
   assert.ok(title.length <= "fix: ".length + 50);
   assert.ok(branch.length <= "fx-054ecdbe-".length + 32);
   assert.equal(branch.endsWith("-"), false);
+});
+
+test("accumulates usage and ignores invalid fields", () => {
+  const total = emptyUsage();
+  addUsage(total, { input: 100, output: 5, cacheRead: 20, cacheWrite: 1, totalTokens: 106, cost: { total: 0.01 } });
+  addUsage(total, { input: -1, output: "x", cacheRead: undefined, cost: null });
+  addUsage(total, null);
+  assert.deepEqual(total, {
+    input: 100,
+    output: 5,
+    cacheRead: 20,
+    cacheWrite: 1,
+    totalTokens: 106,
+    costUsd: 0.01,
+    modelCalls: 0,
+  });
 });

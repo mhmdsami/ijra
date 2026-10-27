@@ -3,6 +3,7 @@ import { addMessage, appendAuditEvent, clearProgress, getRun, touchSessionTitle,
 import { env } from "@/env";
 import { PRUNE_CALLBACKS_SQL, RECORD_CALLBACK_SQL, REPLAY_TTL_MS } from "@/lib/runner/replay";
 import { acceptsReport, parseRunnerReport, reportFingerprint, reportMessage, reportStatus } from "@/lib/runner/report";
+import { parseUsage } from "@/lib/runner/usage";
 import { validSignature } from "@/lib/webhook";
 
 function parseJson(body: string) {
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
 
   const status = reportStatus(payload.status);
   const { visible, errorDetail } = reportMessage({ status, summary: payload.summary, error: payload.outcome?.error });
+  const usage = parseUsage(payload.outcome?.usage);
   await updateRun(run.id, {
     status,
     pr_url: payload.outcome?.prUrl ?? null,
@@ -44,6 +46,12 @@ export async function POST(req: Request) {
     agent_msg: visible ? 1 : 0,
     policy_status: payload.outcome?.policyReasons?.length ? "blocked" : "passed",
     policy_reasons: JSON.stringify(payload.outcome?.policyReasons ?? []),
+    input_tokens: usage.input,
+    output_tokens: usage.output,
+    cache_read_tokens: usage.cacheRead,
+    cache_write_tokens: usage.cacheWrite,
+    cost_usd: usage.costUsd,
+    model_calls: usage.modelCalls,
     error_detail: errorDetail,
   });
   if (visible) await addMessage(run.session_id, "agent", visible);

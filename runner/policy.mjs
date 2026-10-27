@@ -50,3 +50,19 @@ export function branchFromTitle(rawTitle, session) {
     branch: `${TYPE_BRANCH[type]}-${session.slice(0, 8)}-${slug(subject)}`,
   };
 }
+
+export function emptyUsage() {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, costUsd: 0, modelCalls: 0 };
+}
+
+export function addUsage(total, usage) {
+  if (!usage || typeof usage !== "object") return total;
+  const num = (value) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0);
+  total.input += num(usage.input);
+  total.output += num(usage.output);
+  total.cacheRead += num(usage.cacheRead);
+  total.cacheWrite += num(usage.cacheWrite);
+  total.totalTokens += num(usage.totalTokens);
+  total.costUsd += num(usage.cost?.total);
+  return total;
+}

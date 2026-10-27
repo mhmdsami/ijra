@@ -4,7 +4,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHmac, createSign } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { branchFromTitle, changedLineCount, classifyChanges, firstLine, glob } from "./policy.mjs";
+import { addUsage, branchFromTitle, changedLineCount, classifyChanges, emptyUsage, firstLine, glob } from "./policy.mjs";
 
 class RunError extends Error {}
 function die(msg) {
@@ -253,6 +253,7 @@ function runPi(cmd, options) {
         } catch {
           continue;
         }
+        if (event?.type === "message_update" && event.usage) pendingUsage = event.usage;
         const delta = event?.type === "message_update" ? event.assistantMessageEvent : null;
         if (delta?.type === "text_delta" && typeof delta.delta === "string") {
           streamed += delta.delta;
@@ -260,6 +261,9 @@ function runPi(cmd, options) {
           continue;
         }
         if (event?.type === "message_end" && event.message?.role === "assistant") {
+          addUsage(usage, event.message.usage ?? pendingUsage);
+          usage.modelCalls += 1;
+          pendingUsage = null;
           if (event.message.stopReason === "error" && event.message.errorMessage) errorMessage = event.message.errorMessage;
           const text = (event.message.content ?? [])
             .filter((part) => part?.type === "text")
@@ -280,7 +284,13 @@ function runPi(cmd, options) {
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
-    child.on("close", (code) => resolve({ code: code ?? 1, text: (finalMessage || streamed).trim(), stderr, toolCalls, error: errorMessage }));
+    child.on("close", (code) => {
+      if (pendingUsage) {
+        addUsage(usage, pendingUsage);
+        usage.modelCalls += 1;
+      }
+      resolve({ code: code ?? 1, text: (finalMessage || streamed).trim(), stderr, toolCalls, usage, error: errorMessage });
+    });
   });
 }
 
@@ -409,6 +419,7 @@ const outcome = {
   agentSummary: "",
   toolCalls: 0,
   verify: {},
+  usage: emptyUsage(),
 };
 
 try {
@@ -449,6 +460,7 @@ try {
     `pi -p --mode json --provider opencode-go --model ${model} ${skillArgs} ${sessionArgs} < ${shq(requestPath)}`,
     { env: piEnv }
   );
+  outcome.usage = pi.usage;
   if (pi.error) die(pi.error.slice(0, 500));
   if (pi.code !== 0) {
     const detail = pi.text || pi.stderr.trim();

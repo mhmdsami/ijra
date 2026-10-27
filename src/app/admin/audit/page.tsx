@@ -4,6 +4,7 @@ import { AdminNav } from "@/components/admin-nav";
 import { Button } from "@/components/ui/button";
 import { listAuditEvents, listRecentRuns, listUsers } from "@/db";
 import { projects } from "@/lib/projects";
+import { formatCost, formatTokens } from "@/lib/runner/usage";
 import { HeaderActions } from "../../header-actions";
 import { guardAdmin } from "../actions";
 
@@ -111,6 +112,7 @@ export default async function AdminAuditPage({
                     <th className="px-3 py-2 font-medium">Model</th>
                     <th className="px-3 py-2 font-medium">Requester</th>
                     <th className="px-3 py-2 font-medium">Decision</th>
+                    <th className="px-3 py-2 font-medium">Usage</th>
                     <th className="px-3 py-2 font-medium">Links</th>
                   </tr>
                 </thead>
@@ -128,6 +130,11 @@ export default async function AdminAuditPage({
                         {run.decision ?? "—"}
                         {run.decision_reason ? `: ${run.decision_reason}` : ""}
                         {run.decider_email && <span className="ml-1 text-text-tertiary">({run.decider_email})</span>}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 font-mono text-2xs text-text-tertiary">
+                        {run.input_tokens + run.output_tokens > 0
+                          ? `${formatTokens(run.input_tokens + run.output_tokens)} tok · ${formatCost(run.cost_usd)}`
+                          : "—"}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-2xs">
                         <Link
