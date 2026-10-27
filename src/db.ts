@@ -1,5 +1,6 @@
 import { env, now } from "./env";
 import { ACTIVE_RUN_STATUSES, admissionStatement, QUOTA_EXEMPT_STATUSES } from "./lib/admission";
+import { PURGE_AUDIT_SQL } from "./lib/audit-retention";
 import { imageInsertStatement } from "./lib/image-storage";
 import { MAX_IMAGES_PER_SESSION } from "./lib/images";
 import { canTransition } from "./lib/runner/transitions";
@@ -298,6 +299,11 @@ export async function appendAuditEvent(input: {
     )
     .bind(input.runId ?? null, input.sessionId, input.actorId ?? null, input.action, metadata, now())
     .run();
+}
+
+export async function purgeAuditEvents(cutoff: number) {
+  const result = await env().DB.prepare(PURGE_AUDIT_SQL).bind(cutoff).run();
+  return result.meta.changes;
 }
 
 export async function countRunsForUserSince(userId: string, since: number) {

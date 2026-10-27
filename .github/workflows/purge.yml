@@ -1,0 +1,32 @@
+name: Purge audit
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: purge-audit
+  cancel-in-progress: false
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete audit events older than a year
+        env:
+          AUDIT_PURGE_KEY: ${{ secrets.AUDIT_PURGE_KEY }}
+          SITE: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+        run: |
+          if [ -z "$AUDIT_PURGE_KEY" ]; then
+            echo "AUDIT_PURGE_KEY is not set" >&2
+            exit 1
+          fi
+          timestamp=$(date +%s%3N)
+          body='{}'
+          signature=$(printf '%s' "$timestamp.$body" | openssl dgst -sha256 -hmac "$AUDIT_PURGE_KEY" -r | cut -d' ' -f1)
+          curl --fail-with-body -sS -X POST "$SITE/api/internal/purge-audit" \
+            -H "content-type: application/json" \
+            -H "x-ijra-timestamp: $timestamp" \
+            -H "x-ijra-signature: $signature" \
+            -d "$body"

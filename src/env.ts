@@ -5,6 +5,7 @@ export interface Env {
   GITHUB_PAT: string;
   GITHUB_WEBHOOK_SECRET: string;
   IJRA_RUNNER_KEY: string;
+  AUDIT_PURGE_KEY: string;
   IJRA_SESSION_SECRET: string;
   BETTER_AUTH_SECRET: string;
   BETTER_AUTH_URL?: string;

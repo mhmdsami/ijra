@@ -33,7 +33,7 @@ Every action writes an audit event. There is still no automatic merge.
 
 ## Audit
 
-`/admin/audit` lists the most recent runs and audit events, filterable by project and requester. Every request, report, cancel, delete, review action, grant change, and model change writes to `audit_events`. Database triggers reject updates and deletes, so the log is append-only.
+`/admin/audit` lists the most recent runs and audit events, filterable by project and requester. Every request, report, cancel, delete, review action, grant change, and model change writes to `audit_events`. Updates are rejected by a trigger, so retained events stay immutable. A daily scheduled job calls the signed `/api/internal/purge-audit` endpoint to delete events older than 12 months; there is no export.
 
 ## First admin
 
