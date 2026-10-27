@@ -1,7 +1,7 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { dirname, resolve } from "node:path";
+import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const runner = resolve(dirname(fileURLToPath(import.meta.url)), "run-request.mjs");

@@ -1,5 +1,5 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 import { addUsage, branchFromTitle, classifyChanges, emptyUsage, glob } from "./policy.mjs";
 
 const session = "054ecdbe-6db9-4d4f-91cf-a38deba645cb";

@@ -238,6 +238,8 @@ function runPi(cmd, options) {
     let finalMessage = "";
     let stderr = "";
     let toolCalls = 0;
+    let pendingUsage = null;
+    const usage = emptyUsage();
     let errorMessage = "";
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {

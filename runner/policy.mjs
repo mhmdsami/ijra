@@ -63,6 +63,6 @@ export function addUsage(total, usage) {
   total.cacheRead += num(usage.cacheRead);
   total.cacheWrite += num(usage.cacheWrite);
   total.totalTokens += num(usage.totalTokens);
-  total.costUsd += num(usage.cost?.total);
+  total.costUsd += num(usage.costUsd ?? usage.cost?.total);
   return total;
 }
