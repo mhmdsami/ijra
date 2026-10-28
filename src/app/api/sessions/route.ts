@@ -11,11 +11,13 @@ export async function GET(req: Request) {
   const limit = Number.parseInt(params.get("limit") ?? "", 10);
   const offset = Number.parseInt(params.get("offset") ?? "", 10);
   const query = params.get("q") ?? "";
+  const project = params.get("project") ?? "";
   return NextResponse.json(
     await listSessionsForUser(user.id, user.allowedProjects, {
       limit: Number.isFinite(limit) ? limit : undefined,
       offset: Number.isFinite(offset) ? offset : undefined,
       query,
+      project,
     }),
   );
 }

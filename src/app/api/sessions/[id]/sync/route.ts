@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!session || !canAccessSession(user, session)) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const runs = await getRuns(id);
-  const agentMessages: string[] = [];
+  const agentMessages: { text: string; runId: string }[] = [];
 
   for (const run of runs) {
     if (!shouldSyncRun(run)) continue;
@@ -45,11 +45,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
     await touchRun(run.id);
     if (result.changed && MESSAGE_STATUSES.has(result.status)) {
-      if (await claimRunMessage(run.id)) agentMessages.push(renderAgentMessage(result));
+      if (await claimRunMessage(run.id)) agentMessages.push({ text: renderAgentMessage(result), runId: run.id });
     }
   }
 
-  for (const message of agentMessages) await addMessage(id, "agent", message);
+  for (const message of agentMessages) await addMessage(id, "agent", message.text, undefined, message.runId);
   const finalRuns = await getRuns(id);
   return NextResponse.json({
     messages: await getMessages(id),

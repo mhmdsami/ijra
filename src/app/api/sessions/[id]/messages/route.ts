@@ -84,7 +84,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  await addMessage(id, "user", request, imageIds.length > 0 ? { imageIds } : undefined);
+  await addMessage(id, "user", request, imageIds.length > 0 ? { imageIds } : undefined, runId);
   await touchSessionTitle(id, titleFrom(request));
   await appendAuditEvent({
     sessionId: id,

@@ -3,7 +3,7 @@
 import { MessageSquarePlus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { HeaderActions } from "@/app/header-actions";
@@ -19,6 +19,7 @@ import { Wordmark } from "@/components/wordmark";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
 import { projectConfig } from "@/lib/projects";
 import { canRetry } from "@/lib/runner/transitions";
+import { anchorMessageId, type PrCardGroup, prCardGroups } from "@/lib/session-timeline";
 import type { StreamEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -63,9 +64,16 @@ export function SessionView({ initial }: { initial: State }) {
   const anyReview = state.runs.some((r) => r.status === "awaiting_review");
   const activeRun = state.runs.find((r) => ACTIVE.has(r.status));
   const dispatchAt = activeRun?.dispatch_at ?? 0;
-  const latestRun = [...state.runs]
-    .reverse()
-    .find((r) => !ACTIVE.has(r.status) && (r.pr_url || r.status === "blocked"));
+  const cardGroups = prCardGroups(state.runs);
+  const cardsByMessage = new Map<number, PrCardGroup[]>();
+  const trailingGroups: PrCardGroup[] = [];
+  for (const group of cardGroups) {
+    const anchor = anchorMessageId(group, state.messages);
+    if (anchor === null) trailingGroups.push(group);
+    else cardsByMessage.set(anchor, [...(cardsByMessage.get(anchor) ?? []), group]);
+  }
+  const blockedRun = [...state.runs].reverse().find((run) => !run.pr_url && run.status === "blocked");
+  const canAct = initial.isAdmin && !anyActive;
   const lastRun = state.runs.at(-1);
   const hasAgentMessage = state.messages.some((m) => m.role === "agent");
   const silentRun = !!lastRun && !hasAgentMessage && (lastRun.status === "answered" || lastRun.status === "no_changes");
@@ -189,7 +197,15 @@ export function SessionView({ initial }: { initial: State }) {
       ...s,
       messages: [
         ...s.messages,
-        { id: -Date.now(), session_id: s.session.id, role: "user", content, meta: null, created_at: Date.now() },
+        {
+          id: -Date.now(),
+          session_id: s.session.id,
+          role: "user",
+          content,
+          meta: null,
+          run_id: null,
+          created_at: Date.now(),
+        },
       ],
       runs: [
         ...s.runs,
@@ -369,7 +385,18 @@ export function SessionView({ initial }: { initial: State }) {
             />
           )}
           {state.messages.map((m, index) => (
-            <Message key={m.id} index={index} role={m.role} content={m.content} meta={m.meta} />
+            <Fragment key={m.id}>
+              <Message index={index} role={m.role} content={m.content} meta={m.meta} />
+              {(cardsByMessage.get(m.id) ?? []).map((group) => (
+                <PrCard
+                  key={group.url}
+                  run={group.latestRun}
+                  isAdmin={canAct}
+                  onAction={runAction}
+                  busy={acting === group.latestRun.id}
+                />
+              ))}
+            </Fragment>
           ))}
           {anyActive && (
             <div role="status">
@@ -405,8 +432,23 @@ export function SessionView({ initial }: { initial: State }) {
               )}
             </div>
           )}
-          {!anyActive && (
-            <PrCard run={latestRun} isAdmin={initial.isAdmin} onAction={runAction} busy={acting === latestRun?.id} />
+          {trailingGroups.map((group) => (
+            <PrCard
+              key={group.url}
+              run={group.latestRun}
+              isAdmin={canAct}
+              onAction={runAction}
+              busy={acting === group.latestRun.id}
+            />
+          ))}
+          {!anyActive && blockedRun && (
+            <PrCard
+              key={blockedRun.id}
+              run={blockedRun}
+              isAdmin={initial.isAdmin}
+              onAction={runAction}
+              busy={acting === blockedRun.id}
+            />
           )}
           <div ref={bottomRef} />
         </div>

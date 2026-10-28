@@ -7,7 +7,7 @@ import { useSessions } from "@/components/sessions-context";
 import { cn } from "@/lib/utils";
 
 export function SessionSearch({ className }: { className?: string }) {
-  const { query, setQuery } = useSessions();
+  const { query, setQuery, project, setProject, projects } = useSessions();
   const [draft, setDraft] = useState(query);
 
   useEffect(() => {
@@ -21,16 +21,33 @@ export function SessionSearch({ className }: { className?: string }) {
   }, [draft, query, setQuery]);
 
   return (
-    <input
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      placeholder="Search threads"
-      aria-label="Search threads"
-      className={cn(
-        "h-8 w-full rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring",
-        className,
+    <div className="flex min-w-0 gap-1">
+      <input
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        placeholder="Search threads"
+        aria-label="Search threads"
+        className={cn(
+          "h-8 min-w-0 flex-1 rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring",
+          className,
+        )}
+      />
+      {projects.length > 1 && (
+        <select
+          value={project}
+          onChange={(event) => void setProject(event.target.value)}
+          aria-label="Filter by project"
+          className="h-8 max-w-[7.5rem] rounded-md border bg-surface-1 px-1 text-2xs text-foreground outline-none focus-visible:border-ring"
+        >
+          <option value="">All</option>
+          {projects.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
+        </select>
       )}
-    />
+    </div>
   );
 }
 
@@ -53,14 +70,19 @@ export function SessionLoadMore({ className }: { className?: string }) {
 }
 
 export function SessionEmpty({ onStart }: { onStart?: () => void }) {
-  const { query, setQuery } = useSessions();
-  if (query) {
+  const { query, setQuery, project, setProject } = useSessions();
+  if (query || project) {
     return (
       <div className="px-2 py-6 text-center">
-        <p className="text-xs text-text-secondary">No threads match “{query}”.</p>
+        <p className="text-xs text-text-secondary">
+          {query ? `No threads match “${query}”.` : "No threads match this project."}
+        </p>
         <button
           type="button"
-          onClick={() => void setQuery("")}
+          onClick={() => {
+            void setQuery("");
+            void setProject("");
+          }}
           className="mt-2 text-2xs text-primary underline underline-offset-4"
         >
           Clear search

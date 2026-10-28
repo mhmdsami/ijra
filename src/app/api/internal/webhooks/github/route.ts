@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     metadata: { source: "github", delivery: event.delivery },
   });
   if (changed && (to === "merged" || to === "closed") && (await claimRunMessage(run.id))) {
-    await addMessage(run.session_id, "agent", pullStatusMessage(to, event.prUrl));
+    await addMessage(run.session_id, "agent", pullStatusMessage(to, event.prUrl), undefined, run.id);
   }
   console.log(`github webhook ${event.action} ${event.repo} ${event.branch}: ${changed ? to : "no change"}`);
   return NextResponse.json({ ok: true, changed });

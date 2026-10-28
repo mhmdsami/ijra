@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     model_calls: usage.modelCalls,
     error_detail: errorDetail,
   });
-  if (visible && (await claimRunMessage(run.id))) await addMessage(run.session_id, "agent", visible);
+  if (visible && (await claimRunMessage(run.id))) await addMessage(run.session_id, "agent", visible, undefined, run.id);
   await clearProgress(run.id);
   const title = payload.outcome?.title?.trim();
   if (title) await touchSessionTitle(run.session_id, title.slice(0, 80));

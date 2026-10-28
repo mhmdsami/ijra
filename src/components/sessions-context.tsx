@@ -7,8 +7,11 @@ import { SESSIONS_PAGE_MAX, SESSIONS_PAGE_SIZE } from "@/lib/session-list";
 interface SessionsValue {
   sessions: SessionRowWithStatus[];
   showOwner: boolean;
+  projects: string[];
   query: string;
   setQuery: (query: string) => Promise<void>;
+  project: string;
+  setProject: (project: string) => Promise<void>;
   hasMore: boolean;
   loadingMore: boolean;
   loadMore: () => Promise<void>;
@@ -20,8 +23,11 @@ const REFRESH_MS = 20_000;
 const SessionsContext = createContext<SessionsValue>({
   sessions: [],
   showOwner: false,
+  projects: [],
   query: "",
   setQuery: async () => {},
+  project: "",
+  setProject: async () => {},
   hasMore: false,
   loadingMore: false,
   loadMore: async () => {},
@@ -32,27 +38,32 @@ export function SessionsProvider({
   sessions: initialSessions,
   initialHasMore = false,
   viewerId,
+  projects,
   children,
 }: {
   sessions: SessionRowWithStatus[];
   initialHasMore?: boolean;
   viewerId: string;
+  projects: string[];
   children: React.ReactNode;
 }) {
   const [sessions, setSessions] = useState(initialSessions);
   const [query, setQueryState] = useState("");
+  const [project, setProjectState] = useState("");
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loadingMore, setLoadingMore] = useState(false);
   const inFlight = useRef(false);
   const loadingRef = useRef(false);
   const queryRef = useRef("");
+  const projectRef = useRef("");
   const countRef = useRef(initialSessions.length);
   const requestId = useRef(0);
 
-  const fetchPage = useCallback(async (search: string, offset: number, limit: number) => {
+  const fetchPage = useCallback(async (search: string, projectFilter: string, offset: number, limit: number) => {
     const id = ++requestId.current;
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     if (search) params.set("q", search);
+    if (projectFilter) params.set("project", projectFilter);
     const res = await fetch(`/api/sessions?${params.toString()}`, { cache: "no-store" }).catch(() => null);
     if (!res?.ok) return null;
     const data = (await res.json().catch(() => null)) as {
@@ -69,7 +80,7 @@ export function SessionsProvider({
     inFlight.current = true;
     try {
       const limit = Math.max(SESSIONS_PAGE_SIZE, Math.min(countRef.current, SESSIONS_PAGE_MAX));
-      const data = await fetchPage(queryRef.current, 0, limit);
+      const data = await fetchPage(queryRef.current, projectRef.current, 0, limit);
       if (!data) return;
       countRef.current = data.sessions.length;
       setSessions(data.sessions);
@@ -83,7 +94,7 @@ export function SessionsProvider({
     async (next: string) => {
       queryRef.current = next;
       setQueryState(next);
-      const data = await fetchPage(next, 0, SESSIONS_PAGE_SIZE);
+      const data = await fetchPage(next, projectRef.current, 0, SESSIONS_PAGE_SIZE);
       if (!data) return;
       countRef.current = data.sessions.length;
       setSessions(data.sessions);
@@ -97,7 +108,7 @@ export function SessionsProvider({
     loadingRef.current = true;
     setLoadingMore(true);
     try {
-      const data = await fetchPage(queryRef.current, countRef.current, SESSIONS_PAGE_SIZE);
+      const data = await fetchPage(queryRef.current, projectRef.current, countRef.current, SESSIONS_PAGE_SIZE);
       if (!data) return;
       countRef.current += data.sessions.length;
       setSessions((current) => [...current, ...data.sessions]);
@@ -107,6 +118,19 @@ export function SessionsProvider({
       setLoadingMore(false);
     }
   }, [fetchPage, hasMore]);
+
+  const setProject = useCallback(
+    async (next: string) => {
+      projectRef.current = next;
+      setProjectState(next);
+      const data = await fetchPage(queryRef.current, next, 0, SESSIONS_PAGE_SIZE);
+      if (!data) return;
+      countRef.current = data.sessions.length;
+      setSessions(data.sessions);
+      setHasMore(data.hasMore);
+    },
+    [fetchPage],
+  );
 
   useEffect(() => {
     const refreshWhenVisible = () => {
@@ -125,8 +149,11 @@ export function SessionsProvider({
       value={{
         sessions,
         showOwner: sessions.some((session) => session.owner_id !== viewerId),
+        projects,
         query,
         setQuery,
+        project,
+        setProject,
         hasMore,
         loadingMore,
         loadMore,

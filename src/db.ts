@@ -24,6 +24,7 @@ export interface MessageRow {
   role: "user" | "agent";
   content: string;
   meta: string | null;
+  run_id: string | null;
   created_at: number;
 }
 
@@ -246,11 +247,12 @@ export interface SessionRowWithStatus extends SessionRow {
 export async function listSessionsForUser(
   userId: string,
   allowedProjects: string[] | null,
-  options: { limit?: number; offset?: number; query?: string } = {},
+  options: { limit?: number; offset?: number; query?: string; project?: string } = {},
 ): Promise<{ sessions: SessionRowWithStatus[]; hasMore: boolean }> {
   const limit = Math.min(Math.max(options.limit ?? SESSIONS_PAGE_SIZE, 1), SESSIONS_PAGE_MAX);
   const offset = Math.max(options.offset ?? 0, 0);
   const query = (options.query ?? "").trim().slice(0, 100);
+  const project = (options.project ?? "").trim().slice(0, 100);
   if (allowedProjects && allowedProjects.length === 0) return { sessions: [], hasMore: false };
 
   const where: string[] = [];
@@ -265,6 +267,10 @@ export async function listSessionsForUser(
     const pattern = `%${escapeLike(query)}%`;
     where.push("(s.title LIKE ? ESCAPE '\\' OR s.project LIKE ? ESCAPE '\\')");
     binds.push(pattern, pattern);
+  }
+  if (project) {
+    where.push("s.project = ?");
+    binds.push(project);
   }
 
   const stmt = `${listSessionsBase}
@@ -298,10 +304,16 @@ export async function createSession(project: string, ownerId: string, dayStart: 
   return result.meta.changes === 1 ? id : null;
 }
 
-export async function addMessage(sessionId: string, role: "user" | "agent", content: string, meta?: object) {
+export async function addMessage(
+  sessionId: string,
+  role: "user" | "agent",
+  content: string,
+  meta?: object,
+  runId?: string | null,
+) {
   await env()
-    .DB.prepare("INSERT INTO messages (session_id, role, content, meta, created_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(sessionId, role, content, meta ? JSON.stringify(meta) : null, now())
+    .DB.prepare("INSERT INTO messages (session_id, role, content, meta, run_id, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(sessionId, role, content, meta ? JSON.stringify(meta) : null, runId ?? null, now())
     .run();
 }
 
