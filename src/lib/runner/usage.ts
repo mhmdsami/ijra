@@ -14,7 +14,6 @@ function count(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-/** Reads the runner's usage block, tolerating missing or malformed fields. */
 export function parseUsage(value: unknown): RunUsage {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { ...empty };
   const usage = value as Record<string, unknown>;

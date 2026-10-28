@@ -25,7 +25,6 @@ export function ModelRow({
 }) {
   const [pending, startTransition] = useTransition();
   const [actionError, setActionError] = useState<string | null>(null);
-  // rendered after hydration so the server and client markup agree
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => setNow(Date.now()), []);
 

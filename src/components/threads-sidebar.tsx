@@ -18,13 +18,11 @@ export function ThreadsSidebar() {
     if (localStorage.getItem("ijra-sidebar") === "0") setOpen(false);
   }, []);
 
-  // pathname is an intentional trigger; the body resets pending navigation.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: clear pending on navigation
   useEffect(() => {
+    if (!pathname) return;
     setPending(null);
   }, [pathname]);
 
-  // If navigation fails, the pathname never changes; do not leave the highlight stuck.
   useEffect(() => {
     if (!pending) return;
     const timer = setTimeout(() => setPending(null), 10_000);

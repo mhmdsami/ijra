@@ -12,11 +12,6 @@ export interface ImageInsertInput {
   dayStart: number;
 }
 
-/**
- * Inserts an image only while both storage caps hold: images per session and
- * images per owning user since the UTC day start. Counting in the same statement
- * stops concurrent uploads from both passing a pre-check.
- */
 export function imageInsertStatement(input: ImageInsertInput) {
   return {
     sql: `INSERT INTO images (id, session_id, mime, width, height, bytes, created_at)

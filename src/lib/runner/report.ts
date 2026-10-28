@@ -1,7 +1,6 @@
 export const REPORT_STATUSES = ["answered", "no_changes", "awaiting_review", "failed", "blocked"] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
-/** Runs accept a runner report only while they are dispatching, running, or already failed. */
 export const REPORTABLE_RUN_STATUSES = ["dispatching", "running", "failed"] as const;
 
 export interface RunnerReport {
