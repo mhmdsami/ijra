@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDefaultModel, getMessages, getOwnerEmail, getRuns, getSession, listModels } from "@/db";
 import { canAccessSession, canWriteProject, requireUser } from "@/lib/user";
-import { SessionView } from "./session-view";
+import { SessionClient } from "./session-client";
 
 export default async function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,7 +19,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const models = modelRows.map((m) => ({ id: m.id, label: m.label, vision: m.vision === 1 }));
   const visibleRuns = user.isAdmin ? runs : runs.map((run) => ({ ...run, error_detail: null }));
   return (
-    <SessionView
+    <SessionClient
       key={session.id}
       initial={{
         session,
