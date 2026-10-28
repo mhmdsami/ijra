@@ -3,6 +3,10 @@
 import { ArrowUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+function shortLabel(label: string) {
+  return label.replace(/\s*\(.*\)\s*$/, "").trim() || label;
+}
+
 export function ComposerControls({
   model,
   models,
@@ -27,10 +31,11 @@ export function ComposerControls({
         onChange={(e) => onModel(e.target.value)}
         className="w-36 min-w-0 flex-1 cursor-pointer appearance-none truncate rounded-md bg-transparent py-1.5 pr-1 pl-2 text-xs text-muted-foreground outline-none transition-colors hover:text-foreground sm:w-44 sm:flex-none"
         aria-label="Model"
+        title={models.find((m) => m.id === model)?.label}
       >
         {models.map((m) => (
           <option key={m.id} value={m.id} className="bg-background text-foreground">
-            {m.label}
+            {shortLabel(m.label)}
           </option>
         ))}
       </select>

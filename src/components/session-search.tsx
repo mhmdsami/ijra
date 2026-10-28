@@ -28,7 +28,8 @@ export function SessionSearch({ className }: { className?: string }) {
             value={project}
             onChange={(event) => void setProject(event.target.value)}
             aria-label="Filter by project"
-            className="h-8 w-full appearance-none rounded-md border bg-surface-1 pl-2.5 pr-8 text-xs text-foreground outline-none focus-visible:border-ring"
+            title={project || "All projects"}
+            className="h-8 w-full appearance-none rounded-md border bg-surface-1 pl-2.5 pr-8 text-left text-xs text-foreground outline-none focus-visible:border-ring"
           >
             <option value="">All projects</option>
             {projects.map((id) => (

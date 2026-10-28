@@ -99,18 +99,20 @@ export function ThreadsSidebar() {
                       if (pathname !== href) setPending(href);
                     }}
                     className={cn(
-                      "animate-fade-up relative block rounded-md px-2.5 py-2 transition-colors hover:bg-surface-2",
+                      "animate-fade-up relative block rounded-md px-2.5 py-2 transition-[background-color,transform] hover:bg-surface-2 active:scale-[0.99]",
                       (pending ?? pathname) === href && "bg-surface-2",
                     )}
                   >
                     <PendingDot />
-                    <div className="truncate text-sm text-foreground">
-                      {session.title || "Untitled request"}
+                    <div className="truncate text-sm text-foreground">{session.title || "Untitled request"}</div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="min-w-0 truncate text-2xs text-text-tertiary">{session.project}</span>
                       {showOwner && session.owner_email && (
-                        <span className="ml-1.5 text-2xs text-text-tertiary">{session.owner_email.split("@")[0]}</span>
+                        <span className="ml-auto max-w-[40%] truncate text-2xs text-text-tertiary">
+                          {session.owner_email.split("@")[0]}
+                        </span>
                       )}
                     </div>
-                    <div className="mt-1 truncate text-2xs text-text-tertiary">{session.project}</div>
                   </Link>
                 </li>
               );
