@@ -144,6 +144,7 @@
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1.02;
+  text-wrap: balance;
 }
 
 @utility type-label {
@@ -171,6 +172,8 @@
 
   body {
     @apply bg-background font-sans text-base text-foreground;
+    font-optical-sizing: auto;
+    text-wrap: pretty;
   }
 
   button:not(:disabled),
@@ -215,5 +218,20 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop-blur,
+  .backdrop-blur-sm {
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root,
+  .dark {
+    --border: rgb(255 255 255 / 22%);
+    --text-tertiary: oklch(0.72 0.02 167);
   }
 }

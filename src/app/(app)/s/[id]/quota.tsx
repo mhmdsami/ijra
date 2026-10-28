@@ -36,7 +36,7 @@ export function Quota({ refreshKey }: { refreshKey?: number }) {
   if (failed) return <span role="status">usage unavailable</span>;
   if (!quota || quota.limit === null) return null;
   return (
-    <span>
+    <span className="tabular-nums">
       {quota.used}/{quota.limit} used today
     </span>
   );

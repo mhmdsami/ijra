@@ -112,7 +112,7 @@ export function PrCard({
               checks {run.checks_status}
             </span>
           )}
-          {usage && <span className="shrink-0 font-mono text-2xs text-text-tertiary">{usage}</span>}
+          {usage && <span className="shrink-0 font-mono text-2xs text-text-tertiary tabular-nums">{usage}</span>}
         </div>
         {(canMerge || canRetryHere) && !rejecting && (
           <div className="flex shrink-0 items-center justify-end gap-1.5 sm:ml-auto">
