@@ -4,20 +4,12 @@ import { Menu, MessageSquarePlus, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { EmptyState } from "@/components/empty-state";
-import { SessionLoadMore, SessionSearch } from "@/components/session-search";
+import { SessionEmpty, SessionLoadMore, SessionSearch } from "@/components/session-search";
 import { useSessions } from "@/components/sessions-context";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
-function label(status: string | null) {
-  if (!status) return "new";
-  if (status === "dispatching" || status === "running") return "running";
-  return status.replaceAll("_", " ");
-}
-
 export function MobileThreads() {
-  const { sessions, query } = useSessions();
+  const { sessions } = useSessions();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -110,11 +102,7 @@ export function MobileThreads() {
             </div>
             <div className="flex-1 overflow-y-auto px-2 py-1">
               {sessions.length === 0 ? (
-                query ? (
-                  <p className="px-2 py-3 text-xs text-text-tertiary">No threads match.</p>
-                ) : (
-                  <EmptyState variant="inline" title="No threads yet" description="Your requests will appear here." />
-                )
+                <SessionEmpty onStart={() => setOpen(false)} />
               ) : (
                 <ul className="flex flex-col gap-0.5">
                   {sessions.map((session) => (
@@ -128,12 +116,7 @@ export function MobileThreads() {
                         )}
                       >
                         <div className="truncate text-sm">{session.title || "Untitled request"}</div>
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                          <span className="truncate text-2xs text-text-tertiary">{session.project}</span>
-                          <Badge variant="outline" className="h-4 border-border px-1 text-2xs text-text-tertiary">
-                            {label(session.last_status)}
-                          </Badge>
-                        </div>
+                        <div className="mt-1 truncate text-2xs text-text-tertiary">{session.project}</div>
                       </Link>
                     </li>
                   ))}
