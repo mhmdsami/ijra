@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, Check, MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
+import { ArrowDown, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -344,7 +344,7 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
       });
       const data = (await res.json().catch(() => null)) as { title?: string; error?: string } | null;
       if (!res.ok) {
-        setTitleError(data?.error ?? "Could not rename the thread.");
+        setTitleError(data?.error ?? `Could not rename the thread (${res.status}).`);
         return;
       }
       setState((state) => ({ ...state, session: { ...state.session, title: data?.title ?? next } }));
@@ -403,69 +403,76 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
         </div>
       </header>
 
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-4 sm:px-6">
-        {editingTitle ? (
-          <form onSubmit={saveTitle} className="flex min-w-0 flex-1 items-center gap-1">
-            <input
-              ref={titleInputRef}
-              value={titleDraft}
-              onChange={(event) => setTitleDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  setEditingTitle(false);
-                  setTitleError(null);
-                }
-              }}
-              aria-label="Thread title"
-              placeholder="Thread title"
-              maxLength={80}
-              className="h-7 min-w-0 flex-1 rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring"
-            />
-            <Button
-              type="submit"
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Save title"
-              disabled={renaming || !titleDraft.trim()}
-            >
-              <Check className="size-3" />
-            </Button>
-            <Button
+      <div className="relative flex h-9 shrink-0 items-center gap-2 border-b px-4 sm:px-6">
+        <h1 className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+          {state.session.title || "Untitled request"}
+        </h1>
+        <Button
+          size="icon-xs"
+          variant="ghost"
+          aria-label="Edit title"
+          aria-expanded={editingTitle}
+          onClick={() => {
+            setTitleDraft(state.session.title);
+            setTitleError(null);
+            setEditingTitle(true);
+          }}
+        >
+          <Pencil className="size-3" />
+        </Button>
+        {editingTitle && (
+          <>
+            <button
               type="button"
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Cancel title"
+              aria-label="Close title editor"
+              className="fixed inset-0 z-10 cursor-default"
               onClick={() => {
                 setEditingTitle(false);
                 setTitleError(null);
               }}
+            />
+            <form
+              onSubmit={saveTitle}
+              className="absolute top-full right-4 z-20 mt-1 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2 rounded-lg border bg-popover p-2 shadow-overlay sm:right-6"
             >
-              <X className="size-3" />
-            </Button>
-          </form>
-        ) : (
-          <>
-            <h1 className="min-w-0 flex-1 truncate text-xs text-text-secondary">
-              {state.session.title || "Untitled request"}
-            </h1>
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label="Edit title"
-              onClick={() => {
-                setTitleDraft(state.session.title);
-                setTitleError(null);
-                setEditingTitle(true);
-              }}
-            >
-              <Pencil className="size-3" />
-            </Button>
+              <input
+                ref={titleInputRef}
+                value={titleDraft}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setEditingTitle(false);
+                    setTitleError(null);
+                  }
+                }}
+                aria-label="Thread title"
+                placeholder="Thread title"
+                maxLength={80}
+                className="h-8 w-full rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring"
+              />
+              <div className="flex items-center justify-end gap-1">
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="ghost"
+                  onClick={() => {
+                    setEditingTitle(false);
+                    setTitleError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" size="xs" disabled={renaming || !titleDraft.trim()}>
+                  {renaming ? "Saving…" : "Save"}
+                </Button>
+              </div>
+              {titleError && (
+                <p role="alert" className="text-2xs text-destructive">
+                  {titleError}
+                </p>
+              )}
+            </form>
           </>
-        )}
-        {titleError && (
-          <span role="alert" className="shrink-0 text-2xs text-destructive">
-            {titleError}
-          </span>
         )}
       </div>
 
