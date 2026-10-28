@@ -21,14 +21,14 @@ export function SessionSearch({ className }: { className?: string }) {
   }, [draft, query, setQuery]);
 
   return (
-    <div className="flex min-w-0 gap-1">
+    <div className="flex flex-col gap-1">
       <input
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         placeholder="Search threads"
         aria-label="Search threads"
         className={cn(
-          "h-8 min-w-0 flex-1 rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring",
+          "h-8 w-full rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring",
           className,
         )}
       />
@@ -37,9 +37,9 @@ export function SessionSearch({ className }: { className?: string }) {
           value={project}
           onChange={(event) => void setProject(event.target.value)}
           aria-label="Filter by project"
-          className="h-8 max-w-[7.5rem] rounded-md border bg-surface-1 px-1 text-2xs text-foreground outline-none focus-visible:border-ring"
+          className="h-8 w-full rounded-md border bg-surface-1 px-2 text-2xs text-foreground outline-none focus-visible:border-ring"
         >
-          <option value="">All</option>
+          <option value="">All projects</option>
           {projects.map((id) => (
             <option key={id} value={id}>
               {id}

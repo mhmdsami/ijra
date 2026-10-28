@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquarePlus, Trash2 } from "lucide-react";
+import { Check, MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -51,6 +51,11 @@ export function SessionView({ initial }: { initial: State }) {
   const modelSupportsImages = state.models.find((m) => m.id === model)?.vision ?? false;
   const [sendError, setSendError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(initial.session.title);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({
     text: "",
     tools: [],
@@ -307,6 +312,37 @@ export function SessionView({ initial }: { initial: State }) {
     }
   }
 
+  useEffect(() => {
+    if (editingTitle) titleInputRef.current?.focus();
+  }, [editingTitle]);
+
+  async function saveTitle(event: React.FormEvent) {
+    event.preventDefault();
+    const next = titleDraft.trim();
+    if (!next || renaming) return;
+    setRenaming(true);
+    setTitleError(null);
+    try {
+      const res = await fetch(`/api/sessions/${initial.session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next }),
+      });
+      const data = (await res.json().catch(() => null)) as { title?: string; error?: string } | null;
+      if (!res.ok) {
+        setTitleError(data?.error ?? "Could not rename the thread.");
+        return;
+      }
+      setState((state) => ({ ...state, session: { ...state.session, title: data?.title ?? next } }));
+      setEditingTitle(false);
+      void refresh();
+    } catch {
+      setTitleError("Could not rename the thread.");
+    } finally {
+      setRenaming(false);
+    }
+  }
+
   async function deleteThread() {
     if (!confirm("Delete this thread?")) return;
     const res = await fetch(`/api/sessions/${initial.session.id}`, { method: "DELETE" }).catch(() => null);
@@ -353,8 +389,73 @@ export function SessionView({ initial }: { initial: State }) {
         </div>
       </header>
 
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-4 sm:px-6">
+        {editingTitle ? (
+          <form onSubmit={saveTitle} className="flex min-w-0 flex-1 items-center gap-1">
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setEditingTitle(false);
+                  setTitleError(null);
+                }
+              }}
+              aria-label="Thread title"
+              placeholder="Thread title"
+              maxLength={80}
+              className="h-7 min-w-0 flex-1 rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring"
+            />
+            <Button
+              type="submit"
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Save title"
+              disabled={renaming || !titleDraft.trim()}
+            >
+              <Check className="size-3" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Cancel title"
+              onClick={() => {
+                setEditingTitle(false);
+                setTitleError(null);
+              }}
+            >
+              <X className="size-3" />
+            </Button>
+          </form>
+        ) : (
+          <>
+            <h1 className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+              {state.session.title || "Untitled request"}
+            </h1>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Edit title"
+              onClick={() => {
+                setTitleDraft(state.session.title);
+                setTitleError(null);
+                setEditingTitle(true);
+              }}
+            >
+              <Pencil className="size-3" />
+            </Button>
+          </>
+        )}
+        {titleError && (
+          <span role="alert" className="shrink-0 text-2xs text-destructive">
+            {titleError}
+          </span>
+        )}
+      </div>
+
       <div className="mx-auto flex min-h-0 w-full max-w-[45rem] flex-1 flex-col">
-        {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-6 [scrollbar-gutter:stable] sm:gap-7 sm:px-6 sm:py-10">
           {state.messages.length === 0 && (
             <EmptyState
@@ -462,37 +563,40 @@ export function SessionView({ initial }: { initial: State }) {
           )}
           {(silentRun || lastRun?.status === "failed" || lastRun?.status === "cancelled") && (
             <div className="mb-2 space-y-1.5">
-              <p role="status" className="text-xs text-destructive">
-                {lastRun?.status === "failed"
-                  ? "The run failed."
-                  : lastRun?.status === "cancelled"
-                    ? "The run was cancelled."
-                    : "The run finished without a reply."}
-                {lastRun?.status === "failed" && !initial.isAdmin ? " Ask an admin to check the run logs." : ""}
-                {lastRun?.gh_run_url && (
-                  <>
-                    {" "}
-                    <a
-                      href={lastRun.gh_run_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline underline-offset-4 hover:text-foreground"
-                    >
-                      Open the run logs
-                    </a>
-                  </>
+              <div className="flex items-start justify-between gap-3">
+                <p role="status" className="min-w-0 text-xs text-destructive">
+                  {lastRun?.status === "failed"
+                    ? "The run failed."
+                    : lastRun?.status === "cancelled"
+                      ? "The run was cancelled."
+                      : "The run finished without a reply."}
+                  {lastRun?.status === "failed" && !initial.isAdmin ? " Ask an admin to check the run logs." : ""}
+                  {lastRun?.gh_run_url && (
+                    <>
+                      {" "}
+                      <a
+                        href={lastRun.gh_run_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-4 hover:text-foreground"
+                      >
+                        Open the run logs
+                      </a>
+                    </>
+                  )}
+                </p>
+                {initial.isAdmin && lastRun && canRetry(lastRun.status) && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => runAction(lastRun.id, "retry")}
+                    disabled={acting === lastRun.id}
+                  >
+                    {acting === lastRun.id ? "Retrying…" : "Retry"}
+                  </Button>
                 )}
-              </p>
-              {initial.isAdmin && lastRun && canRetry(lastRun.status) && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={() => runAction(lastRun.id, "retry")}
-                  disabled={acting === lastRun.id}
-                >
-                  {acting === lastRun.id ? "Retrying…" : "Retry"}
-                </Button>
-              )}
+              </div>
               {initial.isAdmin && lastRun?.error_detail && (
                 <details className="rounded-md border bg-card px-3 py-2">
                   <summary className="cursor-pointer text-2xs text-text-tertiary">Error details</summary>
@@ -667,13 +771,13 @@ function StatusLine({ runs, onCancel, stage }: { runs: RunRow[]; onCancel: () =>
   const label = stage ? `${base}: ${stage}` : base;
   if (!label) return null;
   return (
-    <div className="animate-fade-up flex items-center gap-2 text-xs text-primary">
-      <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-      {label}
+    <div className="animate-fade-up flex min-w-0 items-center gap-2 text-xs text-primary">
+      <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary" />
+      <span className="min-w-0 truncate">{label}</span>
       <button
         type="button"
         onClick={onCancel}
-        className="ml-1 text-text-tertiary underline underline-offset-4 transition-colors hover:text-foreground"
+        className="ml-1 shrink-0 text-text-tertiary underline underline-offset-4 transition-colors hover:text-foreground"
       >
         cancel
       </button>

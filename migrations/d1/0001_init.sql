@@ -2,6 +2,7 @@ CREATE TABLE sessions (
   id TEXT PRIMARY KEY,
   project TEXT NOT NULL,
   title TEXT NOT NULL DEFAULT '',
+  title_locked INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 
