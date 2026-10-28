@@ -7,7 +7,8 @@ export function firstLine(s) {
 }
 
 export function slug(s) {
-  return firstLine(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "request";
+  const words = firstLine(s).trim().split(/\s+/).filter(Boolean).slice(0, 4);
+  return words.join("-").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "request";
 }
 
 export function glob(pattern) {
