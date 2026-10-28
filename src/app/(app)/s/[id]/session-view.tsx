@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquarePlus, Trash2 } from "lucide-react";
+import { ArrowDown, MessageSquarePlus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -38,6 +38,7 @@ type State = {
   defaultModel: string;
 };
 const ACTIVE = new Set(["dispatching", "running"]);
+const NEAR_BOTTOM = 240;
 
 export function SessionView({ initial }: { initial: State }) {
   const [state, setState] = useState(initial);
@@ -51,11 +52,13 @@ export function SessionView({ initial }: { initial: State }) {
   const modelSupportsImages = state.models.find((m) => m.id === model)?.vision ?? false;
   const [sendError, setSendError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
+  const [showJump, setShowJump] = useState(false);
   const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({
     text: "",
     tools: [],
     stage: "",
   });
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { sessions, refresh } = useSessions();
@@ -179,13 +182,26 @@ export function SessionView({ initial }: { initial: State }) {
     };
   }, [anyActive, anyReview, dispatchAt, poll]);
 
+  const onScroll = () => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    setShowJump(scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > NEAR_BOTTOM);
+  };
+
+  const jumpToLatest = () => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+  };
+
   // Re-run when the message count changes; the body only needs the ref.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages
   useEffect(() => {
-    const scroller = bottomRef.current?.parentElement;
+    const scroller = scrollerRef.current;
     if (!scroller) return;
-    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 240;
+    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < NEAR_BOTTOM;
     if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setShowJump(!nearBottom);
   }, [state.messages.length]);
 
   async function send() {
@@ -355,103 +371,120 @@ export function SessionView({ initial }: { initial: State }) {
 
       <div className="mx-auto flex min-h-0 w-full max-w-[45rem] flex-1 flex-col">
         {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-6 [scrollbar-gutter:stable] sm:gap-7 sm:px-6 sm:py-10">
-          {state.messages.length === 0 && (
-            <EmptyState
-              icon={MessageSquarePlus}
-              title="Describe the change."
-              description={
-                initial.canWrite
-                  ? "The agent works in the repo and opens a pull request for review."
-                  : "Ask questions about this repository. Changes need a project grant."
-              }
-              action={
-                <div className="flex flex-wrap justify-center gap-2">
-                  {["Fix a failing test", "Explain this folder", "Update a dependency"].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => {
-                        setInput(suggestion);
-                        document.getElementById("composer-input")?.focus();
-                      }}
-                      className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              }
-              className="flex-1 justify-center py-8"
-            />
-          )}
-          {state.messages.map((m, index) => (
-            <Fragment key={m.id}>
-              <Message index={index} role={m.role} content={m.content} meta={m.meta} />
-              {(cardsByMessage.get(m.id) ?? []).map((group) => (
-                <PrCard
-                  key={group.url}
-                  run={group.latestRun}
-                  isAdmin={canAct}
-                  onAction={runAction}
-                  busy={acting === group.latestRun.id}
-                />
-              ))}
-            </Fragment>
-          ))}
-          {anyActive && (
-            <div role="status">
-              <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />
-            </div>
-          )}
-          {anyActive && (pollFailing || streamDown) && (
-            <p role="status" className="text-2xs text-text-tertiary">
-              {pollFailing
-                ? "Live updates are failing. The run continues on GitHub."
-                : "Live output paused. Status still updates."}
-            </p>
-          )}
-          {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
-            <div
-              role="log"
-              aria-label="Live agent output"
-              className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-surface-1/60 p-3"
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            ref={scrollerRef}
+            onScroll={onScroll}
+            className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 py-6 [scrollbar-gutter:stable] sm:gap-7 sm:px-6 sm:py-10"
+          >
+            {state.messages.length === 0 && (
+              <EmptyState
+                icon={MessageSquarePlus}
+                title="Describe the change."
+                description={
+                  initial.canWrite
+                    ? "The agent works in the repo and opens a pull request for review."
+                    : "Ask questions about this repository. Changes need a project grant."
+                }
+                action={
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {["Fix a failing test", "Explain this folder", "Update a dependency"].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => {
+                          setInput(suggestion);
+                          document.getElementById("composer-input")?.focus();
+                        }}
+                        className="rounded-md border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                }
+                className="flex-1 justify-center py-8"
+              />
+            )}
+            {state.messages.map((m, index) => (
+              <Fragment key={m.id}>
+                <Message index={index} role={m.role} content={m.content} meta={m.meta} />
+                {(cardsByMessage.get(m.id) ?? []).map((group) => (
+                  <PrCard
+                    key={group.url}
+                    run={group.latestRun}
+                    isAdmin={canAct}
+                    onAction={runAction}
+                    busy={acting === group.latestRun.id}
+                  />
+                ))}
+              </Fragment>
+            ))}
+            {anyActive && (
+              <div role="status">
+                <StatusLine runs={state.runs} onCancel={cancelRun} stage={live.stage} />
+              </div>
+            )}
+            {anyActive && (pollFailing || streamDown) && (
+              <p role="status" className="text-2xs text-text-tertiary">
+                {pollFailing
+                  ? "Live updates are failing. The run continues on GitHub."
+                  : "Live output paused. Status still updates."}
+              </p>
+            )}
+            {anyActive && (live.text.length > 0 || live.tools.length > 0) && (
+              <div
+                role="log"
+                aria-label="Live agent output"
+                className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-surface-1/60 p-3"
+              >
+                {live.tools.length > 0 && (
+                  <div className="flex flex-col gap-0.5 font-mono text-2xs text-text-tertiary">
+                    {live.tools.map((tool, index) => (
+                      <span key={`${index}-${tool}`} className="truncate">
+                        › {tool}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {live.text.length > 0 && (
+                  <p className="max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">
+                    {live.text}
+                  </p>
+                )}
+              </div>
+            )}
+            {trailingGroups.map((group) => (
+              <PrCard
+                key={group.url}
+                run={group.latestRun}
+                isAdmin={canAct}
+                onAction={runAction}
+                busy={acting === group.latestRun.id}
+              />
+            ))}
+            {!anyActive && blockedRun && (
+              <PrCard
+                key={blockedRun.id}
+                run={blockedRun}
+                isAdmin={initial.isAdmin}
+                onAction={runAction}
+                busy={acting === blockedRun.id}
+              />
+            )}
+            <div ref={bottomRef} />
+          </div>
+          {showJump && (
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={jumpToLatest}
+              className="absolute bottom-3 left-1/2 z-10 -translate-x-1/2 border bg-card shadow-card"
             >
-              {live.tools.length > 0 && (
-                <div className="flex flex-col gap-0.5 font-mono text-2xs text-text-tertiary">
-                  {live.tools.map((tool, index) => (
-                    <span key={`${index}-${tool}`} className="truncate">
-                      › {tool}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {live.text.length > 0 && (
-                <p className="max-h-40 overflow-y-auto text-xs leading-5 break-words whitespace-pre-wrap text-foreground/80">
-                  {live.text}
-                </p>
-              )}
-            </div>
+              <ArrowDown />
+              Jump to latest
+            </Button>
           )}
-          {trailingGroups.map((group) => (
-            <PrCard
-              key={group.url}
-              run={group.latestRun}
-              isAdmin={canAct}
-              onAction={runAction}
-              busy={acting === group.latestRun.id}
-            />
-          ))}
-          {!anyActive && blockedRun && (
-            <PrCard
-              key={blockedRun.id}
-              run={blockedRun}
-              isAdmin={initial.isAdmin}
-              onAction={runAction}
-              busy={acting === blockedRun.id}
-            />
-          )}
-          <div ref={bottomRef} />
         </div>
 
         <div className="shrink-0 pb-4 pl-4 pr-4 pt-2 sm:pb-5 sm:pl-6 sm:pr-0">
