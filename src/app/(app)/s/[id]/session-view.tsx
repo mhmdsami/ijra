@@ -19,6 +19,7 @@ import { Wordmark } from "@/components/wordmark";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
 import { projectConfig } from "@/lib/projects";
 import { canRetry } from "@/lib/runner/transitions";
+import { formatCost, formatTokens } from "@/lib/runner/usage";
 import { anchorMessageId, type PrCardGroup, prCardGroups } from "@/lib/session-timeline";
 import type { StreamEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -731,6 +732,10 @@ function PrCard({
 
   const canMerge = isAdmin && run.status === "awaiting_review" && !!run.pr_url;
   const canRetryHere = isAdmin && canRetry(run.status);
+  const tokens = run.input_tokens + run.output_tokens;
+  const usage = [tokens > 0 ? `${formatTokens(tokens)} tok` : null, run.cost_usd > 0 ? formatCost(run.cost_usd) : null]
+    .filter(Boolean)
+    .join(" · ");
 
   const act = async (action: "merge" | "reject" | "retry", body?: Record<string, unknown>) => {
     setError(null);
@@ -777,6 +782,7 @@ function PrCard({
               checks {run.checks_status}
             </span>
           )}
+          {usage && <span className="shrink-0 font-mono text-2xs text-text-tertiary">{usage}</span>}
         </div>
         {(canMerge || canRetryHere) && !rejecting && (
           <div className="flex shrink-0 items-center justify-end gap-1.5 sm:ml-auto">
