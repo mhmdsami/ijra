@@ -23,6 +23,7 @@ import { Message } from "./message";
 import { PrCard, type RunResult } from "./pr-card";
 import { Quota } from "./quota";
 import { StatusLine } from "./status-line";
+import { TitleDialog } from "./title-dialog";
 
 export type SessionInitial = {
   session: SessionRow;
@@ -52,11 +53,7 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
   const [sendError, setSendError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [showJump, setShowJump] = useState(false);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(initial.session.title);
-  const [titleError, setTitleError] = useState<string | null>(null);
-  const [renaming, setRenaming] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [titleOpen, setTitleOpen] = useState(false);
   const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({
     text: "",
     tools: [],
@@ -326,36 +323,25 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
     }
   }
 
-  useEffect(() => {
-    if (editingTitle) titleInputRef.current?.focus();
-  }, [editingTitle]);
-
-  async function saveTitle(event: React.FormEvent) {
-    event.preventDefault();
-    const next = titleDraft.trim();
-    if (!next || renaming) return;
-    setRenaming(true);
-    setTitleError(null);
-    try {
-      const res = await fetch(`/api/sessions/${initial.session.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: next }),
-      });
-      const data = (await res.json().catch(() => null)) as { title?: string; error?: string } | null;
-      if (!res.ok) {
-        setTitleError(data?.error ?? `Could not rename the thread (${res.status}).`);
-        return;
+  const saveTitle = useCallback(
+    async (next: string) => {
+      try {
+        const res = await fetch(`/api/sessions/${initial.session.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: next }),
+        });
+        const data = (await res.json().catch(() => null)) as { title?: string; error?: string } | null;
+        if (!res.ok) return data?.error ?? `Could not rename the thread (${res.status}).`;
+        setState((state) => ({ ...state, session: { ...state.session, title: data?.title ?? next } }));
+        void refresh();
+        return null;
+      } catch {
+        return "Could not rename the thread.";
       }
-      setState((state) => ({ ...state, session: { ...state.session, title: data?.title ?? next } }));
-      setEditingTitle(false);
-      void refresh();
-    } catch {
-      setTitleError("Could not rename the thread.");
-    } finally {
-      setRenaming(false);
-    }
-  }
+    },
+    [initial.session.id, refresh],
+  );
 
   async function deleteThread() {
     if (!confirm("Delete this thread?")) return;
@@ -390,6 +376,14 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
               {state.ownerEmail}
             </span>
           )}
+          {state.isAdmin && (
+            <Link
+              href="/admin"
+              className="rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+            >
+              Admin
+            </Link>
+          )}
           <Button
             onClick={deleteThread}
             variant="ghost"
@@ -403,7 +397,7 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
         </div>
       </header>
 
-      <div className="relative flex h-9 shrink-0 items-center gap-2 border-b px-4 sm:px-6">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-4 sm:px-6">
         <h1 className="min-w-0 flex-1 truncate text-xs text-text-secondary">
           {state.session.title || "Untitled request"}
         </h1>
@@ -411,70 +405,18 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
           size="icon-xs"
           variant="ghost"
           aria-label="Edit title"
-          aria-expanded={editingTitle}
-          onClick={() => {
-            setTitleDraft(state.session.title);
-            setTitleError(null);
-            setEditingTitle(true);
-          }}
+          aria-haspopup="dialog"
+          onClick={() => setTitleOpen(true)}
         >
           <Pencil className="size-3" />
         </Button>
-        {editingTitle && (
-          <>
-            <button
-              type="button"
-              aria-label="Close title editor"
-              className="fixed inset-0 z-10 cursor-default"
-              onClick={() => {
-                setEditingTitle(false);
-                setTitleError(null);
-              }}
-            />
-            <form
-              onSubmit={saveTitle}
-              className="absolute top-full right-4 z-20 mt-1 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2 rounded-lg border bg-popover p-2 shadow-overlay sm:right-6"
-            >
-              <input
-                ref={titleInputRef}
-                value={titleDraft}
-                onChange={(event) => setTitleDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    setEditingTitle(false);
-                    setTitleError(null);
-                  }
-                }}
-                aria-label="Thread title"
-                placeholder="Thread title"
-                maxLength={80}
-                className="h-8 w-full rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring"
-              />
-              <div className="flex items-center justify-end gap-1">
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => {
-                    setEditingTitle(false);
-                    setTitleError(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="xs" disabled={renaming || !titleDraft.trim()}>
-                  {renaming ? "Saving…" : "Save"}
-                </Button>
-              </div>
-              {titleError && (
-                <p role="alert" className="text-2xs text-destructive">
-                  {titleError}
-                </p>
-              )}
-            </form>
-          </>
-        )}
       </div>
+      <TitleDialog
+        open={titleOpen}
+        title={state.session.title}
+        onClose={() => setTitleOpen(false)}
+        onSave={saveTitle}
+      />
 
       <div className="mx-auto flex min-h-0 w-full max-w-[45rem] flex-1 flex-col">
         <div className="relative flex min-h-0 flex-1 flex-col">
