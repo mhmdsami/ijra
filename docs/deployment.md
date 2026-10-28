@@ -44,7 +44,7 @@ Set these secrets on the runner repo:
 Pushes to `main` deploy through `.github/workflows/deploy.yml`:
 
 1. `npm ci`
-2. `npm audit --audit-level=low`
+2. `npm audit --audit-level=low --omit=dev`
 3. `npm run types`
 4. `npm test`
 5. D1 migrations (`wrangler d1 migrations apply ijra --remote`)
