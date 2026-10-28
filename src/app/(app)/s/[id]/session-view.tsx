@@ -1,32 +1,30 @@
 "use client";
 
-import { ArrowDown, MessageSquarePlus, Trash2 } from "lucide-react";
+import { ArrowDown, Check, MessageSquarePlus, Pencil, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { HeaderActions } from "@/app/header-actions";
 import { ComposerControls } from "@/components/composer-controls";
 import { EmptyState } from "@/components/empty-state";
 import { AttachButton, AttachmentTray, uploadImages, useImageQueue } from "@/components/image-attachments";
 import { MobileThreads } from "@/components/mobile-threads";
 import { useSessions } from "@/components/sessions-context";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Wordmark } from "@/components/wordmark";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
 import { projectConfig } from "@/lib/projects";
 import { canRetry } from "@/lib/runner/transitions";
-import { formatCost, formatTokens } from "@/lib/runner/usage";
 import { anchorMessageId, type PrCardGroup, prCardGroups } from "@/lib/session-timeline";
 import type { StreamEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Message } from "./message";
+import { PrCard, type RunResult } from "./pr-card";
+import { Quota } from "./quota";
+import { StatusLine } from "./status-line";
 
-type RunResult = { ok: boolean; error?: string };
-
-type State = {
+export type SessionInitial = {
   session: SessionRow;
   messages: MessageRow[];
   runs: RunRow[];
@@ -37,11 +35,12 @@ type State = {
   models: { id: string; label: string; vision: boolean }[];
   defaultModel: string;
 };
+
 const ACTIVE = new Set(["dispatching", "running"]);
 const NEAR_BOTTOM = 240;
 
-export function SessionView({ initial }: { initial: State }) {
-  const [state, setState] = useState(initial);
+export function SessionView({ initial }: { initial: SessionInitial }) {
+  const [state, setState] = useState<SessionInitial>(initial);
   const [input, setInput] = useState("");
   const lastRunModel = [...initial.runs].reverse().find((run) => run.model)?.model;
   const startingModel =
@@ -53,13 +52,18 @@ export function SessionView({ initial }: { initial: State }) {
   const [sendError, setSendError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
   const [showJump, setShowJump] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(initial.session.title);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const [live, setLive] = useState<{ text: string; tools: string[]; stage: string }>({
     text: "",
     tools: [],
     stage: "",
   });
-  const scrollerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { sessions, refresh } = useSessions();
   const refreshedSidebar = useRef(false);
@@ -89,7 +93,7 @@ export function SessionView({ initial }: { initial: State }) {
     try {
       const res = await fetch(`/api/sessions/${initial.session.id}/sync`, { method: "POST" });
       if (!res.ok) throw new Error(String(res.status));
-      const data = (await res.json()) as Pick<State, "messages" | "runs">;
+      const data = (await res.json()) as Pick<SessionInitial, "messages" | "runs">;
       setPollFailing(false);
       setState((state) => ({ ...state, ...data }));
     } catch {
@@ -115,9 +119,8 @@ export function SessionView({ initial }: { initial: State }) {
     }
   }, [sessions, initial.session.id, refresh]);
 
-  // streamKey is an intentional retry trigger; the body does not read it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reconnect after a stream failure
   useEffect(() => {
+    void streamKey;
     if (!anyActive) {
       setLive({ text: "", tools: [], stage: "" });
       setStreamDown(false);
@@ -182,27 +185,27 @@ export function SessionView({ initial }: { initial: State }) {
     };
   }, [anyActive, anyReview, dispatchAt, poll]);
 
-  const onScroll = () => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    setShowJump(scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > NEAR_BOTTOM);
-  };
-
-  const jumpToLatest = () => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
-  };
-
-  // Re-run when the message count changes; the body only needs the ref.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll on new messages
   useEffect(() => {
+    const messageCount = state.messages.length;
+    if (messageCount === 0) return;
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < NEAR_BOTTOM;
     if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     setShowJump(!nearBottom);
   }, [state.messages.length]);
+
+  function onScroll() {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    setShowJump(scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > NEAR_BOTTOM);
+  }
+
+  function jumpToLatest() {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+  }
 
   async function send() {
     const content = input.trim();
@@ -269,7 +272,7 @@ export function SessionView({ initial }: { initial: State }) {
         body: JSON.stringify({ content, model, imageIds }),
       });
       if (res.ok) {
-        const data = (await res.json()) as Pick<State, "messages" | "runs">;
+        const data = (await res.json()) as Pick<SessionInitial, "messages" | "runs">;
         setState((state) => ({ ...state, ...data }));
         imageQueue.clear();
       } else {
@@ -323,6 +326,37 @@ export function SessionView({ initial }: { initial: State }) {
     }
   }
 
+  useEffect(() => {
+    if (editingTitle) titleInputRef.current?.focus();
+  }, [editingTitle]);
+
+  async function saveTitle(event: React.FormEvent) {
+    event.preventDefault();
+    const next = titleDraft.trim();
+    if (!next || renaming) return;
+    setRenaming(true);
+    setTitleError(null);
+    try {
+      const res = await fetch(`/api/sessions/${initial.session.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next }),
+      });
+      const data = (await res.json().catch(() => null)) as { title?: string; error?: string } | null;
+      if (!res.ok) {
+        setTitleError(data?.error ?? "Could not rename the thread.");
+        return;
+      }
+      setState((state) => ({ ...state, session: { ...state.session, title: data?.title ?? next } }));
+      setEditingTitle(false);
+      void refresh();
+    } catch {
+      setTitleError("Could not rename the thread.");
+    } finally {
+      setRenaming(false);
+    }
+  }
+
   async function deleteThread() {
     if (!confirm("Delete this thread?")) return;
     const res = await fetch(`/api/sessions/${initial.session.id}`, { method: "DELETE" }).catch(() => null);
@@ -369,8 +403,73 @@ export function SessionView({ initial }: { initial: State }) {
         </div>
       </header>
 
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-4 sm:px-6">
+        {editingTitle ? (
+          <form onSubmit={saveTitle} className="flex min-w-0 flex-1 items-center gap-1">
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              onChange={(event) => setTitleDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  setEditingTitle(false);
+                  setTitleError(null);
+                }
+              }}
+              aria-label="Thread title"
+              placeholder="Thread title"
+              maxLength={80}
+              className="h-7 min-w-0 flex-1 rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring"
+            />
+            <Button
+              type="submit"
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Save title"
+              disabled={renaming || !titleDraft.trim()}
+            >
+              <Check className="size-3" />
+            </Button>
+            <Button
+              type="button"
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Cancel title"
+              onClick={() => {
+                setEditingTitle(false);
+                setTitleError(null);
+              }}
+            >
+              <X className="size-3" />
+            </Button>
+          </form>
+        ) : (
+          <>
+            <h1 className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+              {state.session.title || "Untitled request"}
+            </h1>
+            <Button
+              size="icon-xs"
+              variant="ghost"
+              aria-label="Edit title"
+              onClick={() => {
+                setTitleDraft(state.session.title);
+                setTitleError(null);
+                setEditingTitle(true);
+              }}
+            >
+              <Pencil className="size-3" />
+            </Button>
+          </>
+        )}
+        {titleError && (
+          <span role="alert" className="shrink-0 text-2xs text-destructive">
+            {titleError}
+          </span>
+        )}
+      </div>
+
       <div className="mx-auto flex min-h-0 w-full max-w-[45rem] flex-1 flex-col">
-        {state.messages.length > 0 && <h1 className="sr-only">{state.session.title || "Untitled request"}</h1>}
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div
             ref={scrollerRef}
@@ -495,37 +594,40 @@ export function SessionView({ initial }: { initial: State }) {
           )}
           {(silentRun || lastRun?.status === "failed" || lastRun?.status === "cancelled") && (
             <div className="mb-2 space-y-1.5">
-              <p role="status" className="text-xs text-destructive">
-                {lastRun?.status === "failed"
-                  ? "The run failed."
-                  : lastRun?.status === "cancelled"
-                    ? "The run was cancelled."
-                    : "The run finished without a reply."}
-                {lastRun?.status === "failed" && !initial.isAdmin ? " Ask an admin to check the run logs." : ""}
-                {lastRun?.gh_run_url && (
-                  <>
-                    {" "}
-                    <a
-                      href={lastRun.gh_run_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline underline-offset-4 hover:text-foreground"
-                    >
-                      Open the run logs
-                    </a>
-                  </>
+              <div className="flex items-start justify-between gap-3">
+                <p role="status" className="min-w-0 text-xs text-destructive">
+                  {lastRun?.status === "failed"
+                    ? "The run failed."
+                    : lastRun?.status === "cancelled"
+                      ? "The run was cancelled."
+                      : "The run finished without a reply."}
+                  {lastRun?.status === "failed" && !initial.isAdmin ? " Ask an admin to check the run logs." : ""}
+                  {lastRun?.gh_run_url && (
+                    <>
+                      {" "}
+                      <a
+                        href={lastRun.gh_run_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-4 hover:text-foreground"
+                      >
+                        Open the run logs
+                      </a>
+                    </>
+                  )}
+                </p>
+                {initial.isAdmin && lastRun && canRetry(lastRun.status) && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => runAction(lastRun.id, "retry")}
+                    disabled={acting === lastRun.id}
+                  >
+                    {acting === lastRun.id ? "Retrying…" : "Retry"}
+                  </Button>
                 )}
-              </p>
-              {initial.isAdmin && lastRun && canRetry(lastRun.status) && (
-                <Button
-                  size="xs"
-                  variant="outline"
-                  onClick={() => runAction(lastRun.id, "retry")}
-                  disabled={acting === lastRun.id}
-                >
-                  {acting === lastRun.id ? "Retrying…" : "Retry"}
-                </Button>
-              )}
+              </div>
               {initial.isAdmin && lastRun?.error_detail && (
                 <details className="rounded-md border bg-card px-3 py-2">
                   <summary className="cursor-pointer text-2xs text-text-tertiary">Error details</summary>
@@ -605,304 +707,6 @@ export function SessionView({ initial }: { initial: State }) {
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function Quota({ refreshKey }: { refreshKey?: number }) {
-  const [quota, setQuota] = useState<{ used: number; limit: number | null } | null>(null);
-  const [failed, setFailed] = useState(false);
-  // refreshKey is an intentional trigger; the effect does not read it.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refetch on a new run count
-  useEffect(() => {
-    let live = true;
-    const load = async () => {
-      try {
-        const response = await fetch("/api/quota");
-        if (!response.ok) throw new Error(String(response.status));
-        const data = (await response.json()) as { used: number; limit: number | null };
-        if (live) {
-          setQuota(data);
-          setFailed(false);
-        }
-      } catch {
-        if (live) setFailed(true);
-      }
-    };
-    void load();
-    const timer = setInterval(load, 60_000);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      live = false;
-      clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [refreshKey]);
-  if (failed) return <span role="status">usage unavailable</span>;
-  if (!quota || quota.limit === null) return null;
-  return (
-    <span>
-      {quota.used}/{quota.limit} used today
-    </span>
-  );
-}
-
-function Message({
-  role,
-  content,
-  meta,
-  index,
-}: {
-  role: string;
-  content: string;
-  meta?: string | null;
-  index: number;
-}) {
-  const isUser = role === "user";
-  let imageIds: string[] = [];
-  try {
-    const parsed = meta ? (JSON.parse(meta) as { imageIds?: string[] }) : null;
-    if (Array.isArray(parsed?.imageIds)) imageIds = parsed.imageIds.filter((id) => typeof id === "string");
-  } catch {}
-  return (
-    <article
-      className={cn("animate-fade-up flex flex-col", isUser ? "items-end" : "items-stretch")}
-      style={{ animationDelay: `${Math.min(index, 6) * 30}ms` }}
-    >
-      <p className={cn("type-label mb-2", isUser ? "text-primary" : "text-text-tertiary")}>{isUser ? "You" : "ijra"}</p>
-      {isUser ? (
-        <div className="max-w-[85%] rounded-xl border bg-surface-2 px-4 py-3">
-          {imageIds.length > 0 && (
-            <div className="mb-2 flex flex-wrap gap-2">
-              {imageIds.map((id) => (
-                <img key={id} src={`/api/images/${id}`} alt="" className="size-20 rounded-lg border object-cover" />
-              ))}
-            </div>
-          )}
-          <div className="text-base leading-6 break-words whitespace-pre-wrap">{content}</div>
-        </div>
-      ) : (
-        <div className="border-l border-border pl-4">
-          <Markdown text={content} />
-        </div>
-      )}
-    </article>
-  );
-}
-
-function Markdown({ text }: { text: string }) {
-  return (
-    <div className="space-y-3 text-base leading-6 break-words [&_a]:break-all [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4 [&_code]:rounded-sm [&_code]:bg-surface-2 [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_h1,h2,h3]:text-lg [&_h1,h2,h3]:font-medium [&_h1,h2,h3]:tracking-[-0.01em] [&_li]:ml-4 [&_ol]:list-decimal [&_p]:m-0 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:border [&_pre]:bg-surface-1 [&_pre]:p-3 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_strong]:font-medium [&_ul]:list-disc">
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
-    </div>
-  );
-}
-
-function StatusLine({ runs, onCancel, stage }: { runs: RunRow[]; onCancel: () => void; stage?: string }) {
-  const latest = runs.at(-1);
-  if (!latest) return null;
-  const base =
-    latest.status === "dispatching" ? "Dispatching request" : latest.status === "running" ? "Agent is working" : null;
-  const label = stage ? `${base}: ${stage}` : base;
-  if (!label) return null;
-  return (
-    <div className="animate-fade-up flex items-center gap-2 text-xs text-primary">
-      <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-      {label}
-      <button
-        type="button"
-        onClick={onCancel}
-        className="ml-1 text-text-tertiary underline underline-offset-4 transition-colors hover:text-foreground"
-      >
-        cancel
-      </button>
-    </div>
-  );
-}
-
-function shortReason(reason: string) {
-  const idx = reason.indexOf(":");
-  if (idx === -1) return reason;
-  const paths = reason
-    .slice(idx + 1)
-    .split(",")
-    .map((part) => part.trim().split("/").filter(Boolean).pop() ?? part.trim())
-    .join(", ");
-  return `${reason.slice(0, idx)}: ${paths}`;
-}
-
-function PrCard({
-  run,
-  isAdmin,
-  onAction,
-  busy,
-}: {
-  run: RunRow | undefined;
-  isAdmin: boolean;
-  onAction: (runId: string, action: "merge" | "reject" | "retry", body?: Record<string, unknown>) => Promise<RunResult>;
-  busy: boolean;
-}) {
-  const [rejecting, setRejecting] = useState(false);
-  const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  if (!run || (!run.pr_url && run.status !== "blocked")) return null;
-
-  const label =
-    run.status === "awaiting_review"
-      ? "Awaiting review"
-      : run.status === "merged"
-        ? "Merged"
-        : run.status === "rejected"
-          ? "Rejected"
-          : run.status === "closed"
-            ? "Closed"
-            : run.status === "blocked"
-              ? "Blocked"
-              : run.status === "failed"
-                ? "Failed"
-                : run.status;
-  const tone =
-    run.status === "awaiting_review" ? "text-primary" : run.status === "merged" ? "text-primary" : "text-text-tertiary";
-
-  let reasons: string[] = [];
-  try {
-    reasons = run.policy_reasons ? JSON.parse(run.policy_reasons) : [];
-  } catch {}
-
-  const canMerge = isAdmin && run.status === "awaiting_review" && !!run.pr_url;
-  const canRetryHere = isAdmin && canRetry(run.status);
-  const tokens = run.input_tokens + run.output_tokens;
-  const usage = [tokens > 0 ? `${formatTokens(tokens)} tok` : null, run.cost_usd > 0 ? formatCost(run.cost_usd) : null]
-    .filter(Boolean)
-    .join(" · ");
-
-  const act = async (action: "merge" | "reject" | "retry", body?: Record<string, unknown>) => {
-    setError(null);
-    const result = await onAction(run.id, action, body);
-    if (!result.ok) {
-      setError(result.error ?? "The action failed.");
-      return;
-    }
-    setRejecting(false);
-    setReason("");
-  };
-
-  return (
-    <div className="animate-fade-up flex flex-col gap-2 rounded-lg border bg-card px-4 py-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Badge variant="outline" className={cn("shrink-0 text-2xs", tone)}>
-            {label}
-          </Badge>
-          {run.pr_url && (
-            <a
-              href={run.pr_url}
-              target="_blank"
-              rel="noreferrer"
-              className="min-w-0 truncate text-xs underline underline-offset-4 hover:text-foreground"
-            >
-              {run.pr_url.replace(/^https:\/\/github\.com\//, "")}
-            </a>
-          )}
-          {run.branch && (
-            <span className="hidden shrink-0 font-mono text-2xs text-text-tertiary sm:inline">{run.branch}</span>
-          )}
-          {run.checks_status && run.checks_status !== "none" && (
-            <span
-              className={cn(
-                "shrink-0 font-mono text-2xs",
-                run.checks_status === "failing"
-                  ? "text-destructive"
-                  : run.checks_status === "pending"
-                    ? "text-text-tertiary"
-                    : "text-primary",
-              )}
-            >
-              checks {run.checks_status}
-            </span>
-          )}
-          {usage && <span className="shrink-0 font-mono text-2xs text-text-tertiary">{usage}</span>}
-        </div>
-        {(canMerge || canRetryHere) && !rejecting && (
-          <div className="flex shrink-0 items-center justify-end gap-1.5 sm:ml-auto">
-            {canMerge && (
-              <Button size="xs" onClick={() => void act("merge")} disabled={busy}>
-                {busy ? "Merging…" : "Merge"}
-              </Button>
-            )}
-            {canMerge && (
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => {
-                  setRejecting(true);
-                  setError(null);
-                }}
-                disabled={busy}
-              >
-                Reject
-              </Button>
-            )}
-            {canRetryHere && (
-              <Button size="xs" variant="outline" onClick={() => void act("retry")} disabled={busy}>
-                {busy ? "Retrying…" : "Retry"}
-              </Button>
-            )}
-          </div>
-        )}
-        {!canMerge && !canRetryHere && reasons.length > 0 && (
-          <span className="text-2xs text-text-tertiary sm:ml-auto" title={reasons[0]}>
-            {shortReason(reasons[0])}
-          </span>
-        )}
-      </div>
-      {run.status === "rejected" && run.decision_reason && (
-        <p className="text-2xs text-text-tertiary">Rejected: {run.decision_reason}</p>
-      )}
-      {rejecting && (
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (reason.trim()) void act("reject", { reason: reason.trim() });
-          }}
-        >
-          <Textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={2}
-            placeholder="Why is this change being rejected?"
-            aria-label="Rejection reason"
-            className="min-h-10 text-xs"
-            autoFocus
-          />
-          <div className="flex items-center gap-1.5">
-            <Button type="submit" size="xs" variant="destructive" disabled={!reason.trim() || busy}>
-              {busy ? "Rejecting…" : "Reject"}
-            </Button>
-            <Button
-              type="button"
-              size="xs"
-              variant="ghost"
-              onClick={() => {
-                setRejecting(false);
-                setReason("");
-                setError(null);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
-      {error && (
-        <p role="alert" className="text-2xs text-destructive">
-          {error}
-        </p>
-      )}
     </div>
   );
 }

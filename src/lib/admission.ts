@@ -1,6 +1,5 @@
 export const ACTIVE_RUN_STATUSES = ["dispatching", "running"] as const;
 
-/** Outcomes that do not consume the requester's daily quota. */
 export const QUOTA_EXEMPT_STATUSES = ["failed", "blocked", "cancelled"] as const;
 
 export interface AdmissionInput {
@@ -16,11 +15,6 @@ export interface AdmissionInput {
   dispatchAt: number;
 }
 
-/**
- * The insertion that admits a run. It enforces one active run per project and the
- * per-user daily limit in the same statement, so concurrent requests cannot both
- * pass preflight checks and then both insert.
- */
 export function admissionStatement(input: AdmissionInput) {
   const exempt = QUOTA_EXEMPT_STATUSES.map(() => "?").join(", ");
   const limitClause =

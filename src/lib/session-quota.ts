@@ -9,11 +9,6 @@ export interface SessionInsertInput {
   limit?: number;
 }
 
-/**
- * Inserts a session only while the owner is under the thread-creation limit for
- * the current UTC day. Counting in the same statement keeps concurrent creates
- * from both passing a pre-check.
- */
 export function sessionInsertStatement(input: SessionInsertInput) {
   return {
     sql: `INSERT INTO sessions (id, project, owner_id, created_at)

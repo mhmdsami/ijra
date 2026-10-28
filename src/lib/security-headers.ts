@@ -3,11 +3,6 @@ export interface Header {
   value: string;
 }
 
-/**
- * Response headers for the dashboard. A nonce-based CSP would be stricter, but
- * Next injects inline hydration scripts, so the policy allows inline scripts and
- * still locks down framing, plugins, base URLs, and form targets.
- */
 export function securityHeaders(development: boolean): Header[] {
   const scripts = ["'self'", "'unsafe-inline'", ...(development ? ["'unsafe-eval'"] : [])];
   const connections = ["'self'", ...(development ? ["ws:", "wss:"] : [])];

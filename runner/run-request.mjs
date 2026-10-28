@@ -467,7 +467,7 @@ try {
   process.chdir(work);
   if (existingPr?.head?.ref) {
     sh(`git fetch --depth 50 origin ${shq(existingPr.head.ref)}`, "fetch branch", { env: cleanEnv });
-    sh(`git checkout -B ${shq(existingPr.head.ref)} ${shq(`origin/${existingPr.head.ref}`)}`, "checkout branch", { env: cleanEnv });
+    sh(`git checkout -B ${shq(existingPr.head.ref)} FETCH_HEAD`, "checkout branch", { env: cleanEnv });
   }
   emitProgress("stage", "installing dependencies");
   sh(cfg.install.join(" "), "install", { env: cleanEnv });
@@ -493,7 +493,7 @@ try {
   const sessionDir = resolve(here, "../pi-session");
   if (SESSION) mkdirSync(sessionDir, { recursive: true });
   const sessionArgs = SESSION ? `--session-id ${shq(SESSION)} --session-dir ${shq(sessionDir)}` : "";
-  emitProgress("stage", `agent started on ${model}`);
+  emitProgress("stage", "agent started");
   const pi = await runPi(
     `pi -p --mode json --provider opencode-go --model ${model} ${skillArgs} ${sessionArgs} < ${shq(requestPath)}`,
     { env: piEnv, cwd: work }

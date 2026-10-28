@@ -6,7 +6,6 @@ export interface PrCardGroup {
   latestRun: RunRow;
 }
 
-/** One card per pull request, in the order its first run was dispatched. */
 export function prCardGroups(runs: RunRow[]): PrCardGroup[] {
   const groups = new Map<string, PrCardGroup>();
   for (const run of runs) {
@@ -21,7 +20,6 @@ export function prCardGroups(runs: RunRow[]): PrCardGroup[] {
   return [...groups.values()];
 }
 
-/** The agent message that announced the PR, falling back to the first agent message after dispatch. */
 export function anchorMessageId(group: PrCardGroup, messages: MessageRow[]) {
   const direct = messages.find((message) => message.role === "agent" && message.run_id === group.firstRun.id);
   if (direct) return direct.id;

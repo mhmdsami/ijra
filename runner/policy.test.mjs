@@ -75,15 +75,11 @@ test("falls back to chore when the title has no known type", () => {
   assert.equal(branchFromTitle("Update the readme", session).title, "chore: Update the readme");
 });
 
-test("strips trailing punctuation and caps the subject", () => {
-  const { title, branch } = branchFromTitle(
-    `fix: ${"a very long subject that keeps going past the fifty character cap for sure"}.`,
-    session
-  );
+test("strips trailing punctuation and uses at most four slug words", () => {
+  const { title, branch } = branchFromTitle(`fix: one two three four five six.`, session);
   assert.equal(title.endsWith("."), false);
-  assert.ok(title.length <= "fix: ".length + 50);
-  assert.ok(branch.length <= "fx-054ecdbe-".length + 32);
-  assert.equal(branch.endsWith("-"), false);
+  assert.equal(branch, "fx-054ecdbe-one-two-three-four");
+  assert.equal(branch.split("-").length, 6);
 });
 
 test("accumulates usage and ignores invalid fields", () => {

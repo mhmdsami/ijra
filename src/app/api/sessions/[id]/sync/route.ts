@@ -30,9 +30,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const runs = await getRuns(id);
   const agentMessages: { text: string; runId: string }[] = [];
+  let synced = 0;
 
   for (const run of runs) {
+    if (synced >= 5) break;
     if (!shouldSyncRun(run)) continue;
+    synced += 1;
     const result = await syncRun({
       id: run.id,
       project: run.project,

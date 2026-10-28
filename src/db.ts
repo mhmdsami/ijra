@@ -758,3 +758,14 @@ export async function getRuns(sessionId: string) {
 export async function touchSessionTitle(sessionId: string, title: string) {
   await env().DB.prepare("UPDATE sessions SET title = ? WHERE id = ? AND title = ''").bind(title, sessionId).run();
 }
+
+export async function setGeneratedTitle(sessionId: string, title: string) {
+  await env()
+    .DB.prepare("UPDATE sessions SET title = ? WHERE id = ? AND title_locked = 0")
+    .bind(title, sessionId)
+    .run();
+}
+
+export async function renameSession(sessionId: string, title: string) {
+  await env().DB.prepare("UPDATE sessions SET title = ?, title_locked = 1 WHERE id = ?").bind(title, sessionId).run();
+}

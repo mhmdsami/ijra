@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageSquarePlus } from "lucide-react";
+import { ChevronDown, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSessions } from "@/components/sessions-context";
@@ -21,32 +21,38 @@ export function SessionSearch({ className }: { className?: string }) {
   }, [draft, query, setQuery]);
 
   return (
-    <div className="flex min-w-0 gap-1">
+    <div className="flex flex-col gap-1.5">
+      {projects.length > 1 && (
+        <div className="relative">
+          <select
+            value={project}
+            onChange={(event) => void setProject(event.target.value)}
+            aria-label="Filter by project"
+            className="h-8 w-full appearance-none rounded-md border bg-surface-1 pl-2.5 pr-8 text-xs text-foreground outline-none focus-visible:border-ring"
+          >
+            <option value="">All projects</option>
+            {projects.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-text-tertiary"
+            aria-hidden
+          />
+        </div>
+      )}
       <input
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         placeholder="Search threads"
         aria-label="Search threads"
         className={cn(
-          "h-8 min-w-0 flex-1 rounded-md border bg-surface-1 px-2 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring",
+          "h-8 w-full rounded-md border bg-surface-1 px-2.5 text-xs text-foreground outline-none placeholder:text-text-tertiary focus-visible:border-ring",
           className,
         )}
       />
-      {projects.length > 1 && (
-        <select
-          value={project}
-          onChange={(event) => void setProject(event.target.value)}
-          aria-label="Filter by project"
-          className="h-8 max-w-[7.5rem] rounded-md border bg-surface-1 px-1 text-2xs text-foreground outline-none focus-visible:border-ring"
-        >
-          <option value="">All</option>
-          {projects.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
-        </select>
-      )}
     </div>
   );
 }

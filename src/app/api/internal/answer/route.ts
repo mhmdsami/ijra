@@ -5,7 +5,7 @@ import {
   claimRunMessage,
   clearProgress,
   getRun,
-  touchSessionTitle,
+  setGeneratedTitle,
   updateRun,
 } from "@/db";
 import { env } from "@/env";
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
   if (visible && (await claimRunMessage(run.id))) await addMessage(run.session_id, "agent", visible, undefined, run.id);
   await clearProgress(run.id);
   const title = payload.outcome?.title?.trim();
-  if (title) await touchSessionTitle(run.session_id, title.slice(0, 80));
+  if (title) await setGeneratedTitle(run.session_id, title.slice(0, 80));
   await appendAuditEvent({
     sessionId: run.session_id,
     runId: run.id,
