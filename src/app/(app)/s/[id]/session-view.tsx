@@ -206,7 +206,7 @@ export function SessionView({ initial }: { initial: State }) {
 
   async function send() {
     const content = input.trim();
-    if (!content || sending) return;
+    if (!content || sending || anyActive) return;
     setSending(true);
     setSendError(null);
     setInput("");
@@ -537,10 +537,16 @@ export function SessionView({ initial }: { initial: State }) {
             </div>
           )}
           <div className="rounded-xl border bg-card p-2.5 shadow-card sm:p-3">
-            <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} />
+            {anyActive && (
+              <p role="status" className="px-1.5 pb-2 text-2xs text-text-tertiary">
+                A run is active
+              </p>
+            )}
+            <AttachmentTray images={imageQueue.images} onRemove={imageQueue.remove} disabled={anyActive} />
             <Textarea
               value={input}
               id="composer-input"
+              disabled={anyActive}
               onChange={(e) => {
                 setInput(e.target.value);
                 setSendError(null);
@@ -568,7 +574,10 @@ export function SessionView({ initial }: { initial: State }) {
             />
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-2.5 text-2xs text-text-tertiary">
               {modelSupportsImages && (
-                <AttachButton onFiles={imageQueue.add} disabled={sending || imageQueue.images.length >= 3} />
+                <AttachButton
+                  onFiles={imageQueue.add}
+                  disabled={anyActive || sending || imageQueue.images.length >= 3}
+                />
               )}
               <span
                 className={cn("hidden transition-opacity duration-150 sm:inline", input ? "opacity-0" : "opacity-100")}
@@ -584,7 +593,7 @@ export function SessionView({ initial }: { initial: State }) {
                   onModel={setModel}
                   onSend={send}
                   busy={sending}
-                  disabled={!input.trim()}
+                  disabled={anyActive || !input.trim()}
                 />
               </span>
             </div>

@@ -77,7 +77,15 @@ export async function uploadImages(sessionId: string, images: PendingImage[]) {
   return ids;
 }
 
-export function AttachmentTray({ images, onRemove }: { images: PendingImage[]; onRemove: (key: string) => void }) {
+export function AttachmentTray({
+  images,
+  onRemove,
+  disabled,
+}: {
+  images: PendingImage[];
+  onRemove: (key: string) => void;
+  disabled?: boolean;
+}) {
   if (images.length === 0) return null;
   return (
     <div className="flex flex-wrap gap-2 pb-2">
@@ -91,7 +99,8 @@ export function AttachmentTray({ images, onRemove }: { images: PendingImage[]; o
           <button
             type="button"
             onClick={() => onRemove(image.key)}
-            className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center rounded-sm border bg-card p-0.5 text-muted-foreground transition-colors hover:text-destructive max-sm:size-7"
+            disabled={disabled}
+            className="absolute -top-1.5 -right-1.5 inline-flex items-center justify-center rounded-sm border bg-card p-0.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-40 max-sm:size-7"
             aria-label="Remove image"
           >
             <X className="size-3" />
