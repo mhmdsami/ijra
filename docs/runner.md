@@ -32,11 +32,11 @@ A failed check marks the run blocked. The runner never merges; admins merge from
 
 ## Verification and PRs
 
-Clean changes run the project's type-check and build commands from the registry. Commits go through the Git data API, which produces GitHub-signed commits, then the PR is opened and waits for review. When the project sets `reviewer`, the runner requests that GitHub user as a reviewer, which triggers their review-request notifications (including the GitHub mobile app). The dashboard records the PR URL and branch on the run.
+Clean changes run the project's type-check and build commands from the registry. Commits go through the Git data API, which produces GitHub-signed commits, then the PR is opened and waits for review. When the thread already has an open PR, the runner checks out that branch, commits on top of it, and updates the PR description instead of opening a new PR; a new PR starts only after the previous one is merged or closed. When the project sets `reviewer`, the runner requests that GitHub user as a reviewer, which triggers their review-request notifications (including the GitHub mobile app). The dashboard records the PR URL and branch on the run.
 
 ## Reporting
 
-The runner reports over an HMAC-signed webhook to `/api/internal/answer`. The report includes token and cost usage for the main agent run, aggregated from Pi's `message_update` and `message_end` events; title generation is not counted. The session client triggers a sync `POST`, which polls the Actions API from the dashboard. The webhook stores the agent reply as the chat message and sets `agent_msg`, so the poller does not duplicate it.
+The agent's `## Chat reply` section becomes the chat message; the `## PR description` sections go only into the pull request body. The runner reports over an HMAC-signed webhook to `/api/internal/answer`. The report includes token and cost usage for the main agent run, aggregated from Pi's `message_update` and `message_end` events; title generation is not counted. The session client triggers a sync `POST`, which polls the Actions API from the dashboard. The webhook stores the agent reply as the chat message and sets `agent_msg`, so the poller does not duplicate it.
 
 ## Checks
 

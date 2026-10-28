@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addUsage, branchFromTitle, classifyChanges, emptyUsage, glob } from "./policy.mjs";
+import { addUsage, branchFromTitle, classifyChanges, emptyUsage, glob, parseAgentReply, stripSessionFooter } from "./policy.mjs";
 
 const session = "054ecdbe-6db9-4d4f-91cf-a38deba645cb";
 
@@ -100,4 +100,34 @@ test("accumulates usage and ignores invalid fields", () => {
     costUsd: 0.01,
     modelCalls: 0,
   });
+});
+
+test("parses a chat reply separately from the PR description", () => {
+  const reply = parseAgentReply(`Title: fix: restore composer selector
+
+## Chat reply
+Restored the compact selectors and left the spacing alone.
+
+## PR description
+## Summary
+The composer selectors are compact again.
+
+## Changes
+- Restored the selector width`);
+  assert.equal(reply.title, "fix: restore composer selector");
+  assert.equal(reply.chatReply, "Restored the compact selectors and left the spacing alone.");
+  assert.match(reply.description, /^## Summary/);
+  assert.match(reply.description, /Restored the selector width/);
+});
+
+test("falls back to the whole text when there is no reply section", () => {
+  const reply = parseAgentReply("Just an answer, no metadata.");
+  assert.equal(reply.chatReply, "");
+  assert.equal(reply.description, "Just an answer, no metadata.");
+});
+
+test("strips the session footer", () => {
+  assert.equal(stripSessionFooter("Body\n\n---\nSession: https://x"), "Body");
+  assert.equal(stripSessionFooter("Body\n| | |\n| x | y |"), "Body");
+  assert.equal(stripSessionFooter("Body"), "Body");
 });

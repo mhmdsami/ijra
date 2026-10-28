@@ -66,3 +66,31 @@ export function addUsage(total, usage) {
   total.costUsd += num(usage.costUsd ?? usage.cost?.total);
   return total;
 }
+
+export function parseAgentReply(text) {
+  const titleMatch = text.match(/^Title:\s*(.+)$/m);
+  const replyMatch = text.match(/##\s+Chat reply\s*\n([\s\S]*?)(?=\n##\s+(?:PR description|Summary|Changes|Verification|Risks)\b|$)/i);
+  const prIndex = text.search(/\n##\s+PR description\b/i);
+  let description;
+  if (prIndex >= 0) {
+    description = text.slice(prIndex).replace(/^\s*##\s+PR description\s*/i, "").trim();
+  } else if (titleMatch) {
+    description =
+      text
+        .slice(text.indexOf(titleMatch[0]) + titleMatch[0].length)
+        .replace(/^\s*##\s+PR description\s*/i, "")
+        .trim() || text;
+  } else {
+    description = text;
+  }
+  if (prIndex < 0 && replyMatch) {
+    description = description.replace(replyMatch[0], "").trim();
+  }
+  return { title: titleMatch?.[1]?.trim() ?? "", chatReply: replyMatch?.[1]?.trim() ?? "", description: description.trim() };
+}
+
+export function stripSessionFooter(body) {
+  const stops = [body.indexOf("\n\n---\nSession:"), body.indexOf("\n| | |")].filter((index) => index !== -1);
+  if (stops.length === 0) return body.trim();
+  return body.slice(0, Math.min(...stops)).trim();
+}
