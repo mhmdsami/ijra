@@ -20,6 +20,12 @@ export function prCardGroups(runs: RunRow[]): PrCardGroup[] {
   return [...groups.values()];
 }
 
+export function pendingBlockedRun(runs: RunRow[]) {
+  const latest = runs.at(-1);
+  if (latest?.status !== "blocked" || latest.pr_url) return undefined;
+  return latest;
+}
+
 export function anchorMessageId(group: PrCardGroup, messages: MessageRow[]) {
   const direct = messages.find((message) => message.role === "agent" && message.run_id === group.firstRun.id);
   if (direct) return direct.id;

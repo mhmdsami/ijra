@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { MessageRow, RunRow } from "../db.ts";
-import { anchorMessageId, prCardGroups } from "./session-timeline.ts";
+import { anchorMessageId, pendingBlockedRun, prCardGroups } from "./session-timeline.ts";
 
 function run(overrides: Partial<RunRow>): RunRow {
   return {
@@ -87,4 +87,19 @@ test("falls back to the first agent message after dispatch", () => {
 test("returns null when no message can anchor the card", () => {
   const group = prCardGroups([run({ id: "a", pr_url: "https://x/1", dispatch_at: 50 })])[0];
   assert.equal(anchorMessageId(group, [message({ id: 1, created_at: 40 })]), null);
+});
+
+test("surfaces a blocked run only while it is the latest attempt", () => {
+  const blocked = run({ id: "a", status: "blocked", dispatch_at: 10 });
+  assert.equal(pendingBlockedRun([blocked]), blocked);
+  assert.equal(pendingBlockedRun([blocked, run({ id: "b", status: "answered", dispatch_at: 20 })]), undefined);
+  assert.equal(
+    pendingBlockedRun([blocked, run({ id: "c", status: "awaiting_review", dispatch_at: 30, pr_url: "https://x/1" })]),
+    undefined,
+  );
+});
+
+test("ignores an empty run list and a blocked run that already has a pull request", () => {
+  assert.equal(pendingBlockedRun([]), undefined);
+  assert.equal(pendingBlockedRun([run({ status: "blocked", pr_url: "https://x/1" })]), undefined);
 });

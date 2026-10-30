@@ -16,7 +16,7 @@ import { Wordmark } from "@/components/wordmark";
 import type { MessageRow, RunRow, SessionRow } from "@/db";
 import { projectConfig } from "@/lib/projects";
 import { canRetry } from "@/lib/runner/transitions";
-import { anchorMessageId, type PrCardGroup, prCardGroups } from "@/lib/session-timeline";
+import { anchorMessageId, type PrCardGroup, pendingBlockedRun, prCardGroups } from "@/lib/session-timeline";
 import type { StreamEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Message } from "./message";
@@ -77,7 +77,7 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
     if (anchor === null) trailingGroups.push(group);
     else cardsByMessage.set(anchor, [...(cardsByMessage.get(anchor) ?? []), group]);
   }
-  const blockedRun = [...state.runs].reverse().find((run) => !run.pr_url && run.status === "blocked");
+  const blockedRun = pendingBlockedRun(state.runs);
   const canAct = initial.isAdmin && !anyActive;
   const lastRun = state.runs.at(-1);
   const hasAgentMessage = state.messages.some((m) => m.role === "agent");
