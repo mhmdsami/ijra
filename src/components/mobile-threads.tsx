@@ -75,13 +75,13 @@ export function MobileThreads() {
             onKeyDown={trapTab}
             className="relative flex h-full w-[min(19rem,86vw)] flex-col border-r bg-background shadow-overlay"
           >
-            <div className="flex h-14 items-center justify-between px-4">
+            <div className="flex h-14 shrink-0 items-center justify-between gap-2 pl-4 pr-1">
               <span className="type-label text-text-tertiary">Threads</span>
-              <div className="flex items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1">
                 <Link
                   href="/"
                   onClick={() => setOpen(false)}
-                  className="inline-flex size-11 items-center justify-center rounded-md text-primary transition-colors hover:bg-surface-2"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-primary transition-colors hover:bg-surface-2"
                   aria-label="New thread"
                 >
                   <MessageSquarePlus className="size-4" />
@@ -90,7 +90,7 @@ export function MobileThreads() {
                   type="button"
                   ref={closeRef}
                   onClick={() => setOpen(false)}
-                  className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+                  className="inline-flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
                   aria-label="Close threads"
                 >
                   <X className="size-4" />
