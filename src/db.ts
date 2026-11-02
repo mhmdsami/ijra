@@ -10,6 +10,10 @@ import type { ProgressEvent, ProgressRow, SessionImage } from "./lib/types";
 
 export const DEFAULT_DAILY_LIMIT = 5;
 
+const MESSAGES_PAGE_SIZE = 500;
+const RUNS_PAGE_SIZE = 200;
+const USERS_PAGE_SIZE = 500;
+
 export interface SessionRow {
   id: string;
   project: string;
@@ -180,10 +184,16 @@ export async function promoteToAdmin(userId: string) {
 }
 
 export async function listUsers() {
-  const { results } = await env()
-    .DB.prepare("SELECT id, email, name, role, createdAt FROM user ORDER BY createdAt")
-    .all<{ id: string; email: string; name: string; role: string | null; createdAt: number }>();
-  return results ?? [];
+  const users: { id: string; email: string; name: string; role: string | null; createdAt: number }[] = [];
+  for (let offset = 0; ; offset += USERS_PAGE_SIZE) {
+    const { results } = await env()
+      .DB.prepare("SELECT id, email, name, role, createdAt FROM user ORDER BY createdAt LIMIT ? OFFSET ?")
+      .bind(USERS_PAGE_SIZE, offset)
+      .all<{ id: string; email: string; name: string; role: string | null; createdAt: number }>();
+    users.push(...results);
+    if (results.length < USERS_PAGE_SIZE) break;
+  }
+  return users;
 }
 
 export async function getSuperAdminId() {
@@ -236,8 +246,6 @@ const listSessionsBase = `
   SELECT s.*, (SELECT r.status FROM runs r WHERE r.session_id = s.id ORDER BY r.dispatch_at DESC, r.rowid DESC LIMIT 1) AS last_status,
     (SELECT email FROM user WHERE id = s.owner_id) AS owner_email
   FROM sessions s`;
-const getMessagesStmt = "SELECT * FROM messages WHERE session_id = ? ORDER BY created_at, id";
-const getRunsStmt = "SELECT * FROM runs WHERE session_id = ? ORDER BY dispatch_at, rowid";
 
 export interface SessionRowWithStatus extends SessionRow {
   last_status: string | null;
@@ -318,8 +326,20 @@ export async function addMessage(
 }
 
 export async function getMessages(sessionId: string) {
-  const { results } = await env().DB.prepare(getMessagesStmt).bind(sessionId).all<MessageRow>();
-  return results ?? [];
+  const messages: MessageRow[] = [];
+  let before = Number.MAX_SAFE_INTEGER;
+  for (;;) {
+    const { results } = await env()
+      .DB.prepare(
+        "SELECT * FROM (SELECT * FROM messages WHERE session_id = ? AND id < ? ORDER BY id DESC LIMIT ?) ORDER BY id",
+      )
+      .bind(sessionId, before, MESSAGES_PAGE_SIZE)
+      .all<MessageRow>();
+    messages.unshift(...results);
+    if (results.length < MESSAGES_PAGE_SIZE) break;
+    before = results[0].id;
+  }
+  return messages;
 }
 
 const secretKey = /token|secret|password|authorization|cookie|api[_-]?key|private[_-]?key/i;
@@ -751,8 +771,18 @@ export async function findRunByBranch(project: string, branch: string) {
 }
 
 export async function getRuns(sessionId: string) {
-  const { results } = await env().DB.prepare(getRunsStmt).bind(sessionId).all<RunRow>();
-  return results ?? [];
+  const runs: RunRow[] = [];
+  for (let offset = 0; ; offset += RUNS_PAGE_SIZE) {
+    const { results } = await env()
+      .DB.prepare(
+        "SELECT * FROM (SELECT * FROM runs WHERE session_id = ? ORDER BY dispatch_at DESC, rowid DESC LIMIT ? OFFSET ?) ORDER BY dispatch_at, rowid",
+      )
+      .bind(sessionId, RUNS_PAGE_SIZE, offset)
+      .all<RunRow>();
+    runs.unshift(...results);
+    if (results.length < RUNS_PAGE_SIZE) break;
+  }
+  return runs;
 }
 
 export async function touchSessionTitle(sessionId: string, title: string) {
