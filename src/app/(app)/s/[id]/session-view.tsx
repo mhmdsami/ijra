@@ -3,7 +3,7 @@
 import { ArrowDown, MessageSquarePlus, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { HeaderActions } from "@/app/header-actions";
 import { ComposerControls } from "@/components/composer-controls";
 import { EmptyState } from "@/components/empty-state";
@@ -59,8 +59,9 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
     tools: [],
     stage: "",
   });
-  const bottomRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
+  const lastDistanceRef = useRef(0);
   const router = useRouter();
   const { sessions, refresh } = useSessions();
   const refreshedSidebar = useRef(false);
@@ -182,25 +183,52 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
     };
   }, [anyActive, anyReview, dispatchAt, poll]);
 
-  useEffect(() => {
-    const messageCount = state.messages.length;
-    if (messageCount === 0) return;
+  useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < NEAR_BOTTOM;
-    if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    setShowJump(!nearBottom);
-  }, [state.messages.length]);
+    let alive = true;
+    const snap = () => {
+      if (!alive || !stickRef.current) return;
+      scroller.scrollTop = scroller.scrollHeight;
+    };
+    snap();
+    stickRef.current = true;
+    lastDistanceRef.current = 0;
+    setShowJump(false);
+    void document.fonts?.ready.then(snap);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    if (state.messages.length === 0 && state.runs.length === 0) return;
+    if (!stickRef.current) {
+      setShowJump(true);
+      return;
+    }
+    if (scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 1) return;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
+  }, [state.messages.length, state.runs.length]);
 
   function onScroll() {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    setShowJump(scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight > NEAR_BOTTOM);
+    const distance = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+    if (distance > lastDistanceRef.current) stickRef.current = false;
+    if (distance <= NEAR_BOTTOM) stickRef.current = true;
+    lastDistanceRef.current = distance;
+    setShowJump(distance > NEAR_BOTTOM && !stickRef.current);
   }
 
   function jumpToLatest() {
     const scroller = scrollerRef.current;
     if (!scroller) return;
+    stickRef.current = true;
+    lastDistanceRef.current = 0;
+    setShowJump(false);
     scroller.scrollTo({ top: scroller.scrollHeight, behavior: "smooth" });
   }
 
@@ -520,7 +548,6 @@ export function SessionView({ initial }: { initial: SessionInitial }) {
                 busy={acting === blockedRun.id}
               />
             )}
-            <div ref={bottomRef} />
           </div>
           {showJump && (
             <Button
