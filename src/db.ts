@@ -187,7 +187,7 @@ export async function listUsers() {
   const users: { id: string; email: string; name: string; role: string | null; createdAt: number }[] = [];
   for (let offset = 0; ; offset += USERS_PAGE_SIZE) {
     const { results } = await env()
-      .DB.prepare("SELECT id, email, name, role, createdAt FROM user ORDER BY createdAt LIMIT ? OFFSET ?")
+      .DB.prepare("SELECT id, email, name, role, createdAt FROM user ORDER BY createdAt, id LIMIT ? OFFSET ?")
       .bind(USERS_PAGE_SIZE, offset)
       .all<{ id: string; email: string; name: string; role: string | null; createdAt: number }>();
     users.push(...results);
@@ -775,7 +775,7 @@ export async function getRuns(sessionId: string) {
   for (let offset = 0; ; offset += RUNS_PAGE_SIZE) {
     const { results } = await env()
       .DB.prepare(
-        "SELECT * FROM (SELECT * FROM runs WHERE session_id = ? ORDER BY dispatch_at DESC, rowid DESC LIMIT ? OFFSET ?) ORDER BY dispatch_at, rowid",
+        "SELECT * FROM (SELECT * FROM runs WHERE session_id = ? ORDER BY dispatch_at DESC, id DESC LIMIT ? OFFSET ?) ORDER BY dispatch_at, id",
       )
       .bind(sessionId, RUNS_PAGE_SIZE, offset)
       .all<RunRow>();
