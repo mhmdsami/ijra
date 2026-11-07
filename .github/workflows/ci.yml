@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Write private project config
+        run: echo "${PROJECTS_JSON:-[]}" > src/projects.json
+        env:
+          PROJECTS_JSON: ${{ secrets.PROJECTS_JSON }}
+
+      - run: npm run gate
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}

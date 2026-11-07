@@ -44,11 +44,11 @@ Set these secrets on the runner repo:
 Pushes to `main` deploy through `.github/workflows/deploy.yml`:
 
 1. `npm ci`
-2. `npm audit --audit-level=low --omit=dev`
-3. `npm run types`
-4. `npm test`
-5. D1 migrations (`wrangler d1 migrations apply ijra --remote`)
-6. `npm run deploy`
+2. D1 migrations (`wrangler d1 migrations apply ijra --remote`)
+3. `npm run deploy` (OpenNext build, then deploy)
+
+Checks (types, lint, tests, audit) run in the `pre-commit` hook via `npm run gate`,
+and in the manual-only `.github/workflows/ci.yml`.
 
 ## Manual deploy
 
