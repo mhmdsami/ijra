@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ijra",
-  "main": ".open-next/worker.js",
+  "main": "worker.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "routes": [{ "pattern": "ijra.sam1.space", "custom_domain": true }],
@@ -19,5 +19,8 @@
   ],
   "observability": {
     "enabled": true
+  },
+  "triggers": {
+    "crons": ["17 3 * * *"]
   }
 }
